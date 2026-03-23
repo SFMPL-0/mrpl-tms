@@ -559,12 +559,12 @@ async function bootApp(profile) {
   document.getElementById('sb-role').textContent  = profile.role.toUpperCase() + (userSection ? ' · Sec ' + userSection : '');
   document.getElementById('sb-avatar').textContent = profile.full_name.charAt(0).toUpperCase();
 
-  // Apply role visibility
-  applyRoleUI();
-
-  // Show app
+  // Show app FIRST, then apply role (so DOM exists)
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-screen').style.display   = 'block';
+
+  // Apply role visibility AFTER DOM is visible
+  applyRoleUI();
 
   // If user role, immediately show their section
   if (userRole === 'user' && userSection) {
@@ -579,8 +579,14 @@ async function bootApp(profile) {
 function applyRoleUI() {
   var isAdmin = userRole === 'admin' || userRole === 'superadmin';
   var isSA    = userRole === 'superadmin';
-  document.querySelectorAll('.admin-only').forEach(function(el){ el.style.display = isAdmin ? '' : 'none'; });
-  document.querySelectorAll('.superadmin-only').forEach(function(el){ el.style.display = isSA ? '' : 'none'; });
+  // Show/hide admin sections
+  document.querySelectorAll('.admin-only').forEach(function(el){
+    el.style.display = isAdmin ? '' : 'none';
+  });
+  document.querySelectorAll('.superadmin-only').forEach(function(el){
+    el.style.display = isSA ? '' : 'none';
+  });
+  console.log('Role:', userRole, '| isAdmin:', isAdmin, '| isSA:', isSA);
   // If regular user, hide section nav items that are not theirs
   if (userRole === 'user') {
     for (var i = 1; i <= 7; i++) {
