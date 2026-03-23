@@ -344,6 +344,11 @@ textarea{resize:vertical;min-height:70px;}
         <button class="nav-item" onclick="showPanel('accheck')"><span class="nav-icon">✅</span> Account Check</button>
       </div>
       <div class="nav-divider superadmin-only"></div>
+      <div class="nav-section admin-only">
+        <div class="nav-label">Edit Records</div>
+        <button class="nav-item" onclick="showPanel('edit')"><span class="nav-icon">✏️</span> Edit Any Record</button>
+      </div>
+      <div class="nav-divider superadmin-only"></div>
       <div class="nav-section superadmin-only">
         <div class="nav-label">Admin</div>
         <button class="nav-item" onclick="showPanel('users')"><span class="nav-icon">👤</span> User Management</button>
@@ -427,6 +432,25 @@ textarea{resize:vertical;min-height:70px;}
       <div id="panel-db-grade"       class="panel"></div>
       <div id="panel-reports"        class="panel"></div>
       <div id="panel-accheck"        class="panel"></div>
+
+      <!-- EDIT RECORD (admin/superadmin) -->
+      <div id="panel-edit" class="panel">
+        <div style="background:var(--amberlt);border:1px solid #fcd34d;border-radius:var(--radius);padding:10px 14px;font-size:11px;font-weight:600;color:#92400e;margin-bottom:16px;">
+          ✏️ Admin Edit Mode — Edit ANY field of ANY record. Search by DO No. and update everything.
+        </div>
+        <div class="form-block" style="margin-bottom:14px;">
+          <div class="form-block-title">🔍 Search Record to Edit</div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;">
+            <div class="form-group">
+              <label>DO Number</label>
+              <input id="edit-search-do" placeholder="Type DO No. to search" oninput="editSearchDO()">
+            </div>
+            <button class="btn btn-amber" onclick="editSearchDO()">Search</button>
+          </div>
+          <div id="edit-search-results" style="margin-top:10px;"></div>
+        </div>
+        <div id="edit-record-content"></div>
+      </div>
 
       <!-- USER MANAGEMENT (superadmin only) -->
       <div id="panel-users" class="panel">
@@ -639,6 +663,7 @@ var panelMeta = {
   'reports':        {title:'Master Report',      sub:'Freight · Payment · Invoice · Insurance · Status · Summary'},
   'accheck':        {title:'Account Check',      sub:'Track Advance & Balance payments'},
   'users':          {title:'User Management',    sub:'Create & manage system users (Super Admin only)'},
+  'edit':           {title:'Edit Record',          sub:'Admin & Super Admin — edit any field of any record'},
 };
 
 function showPanel(name) {
@@ -657,6 +682,7 @@ function showPanel(name) {
   if (name === 'reports')   showReportsPanel();
   if (name === 'accheck')   showAccountCheckPanel();
   if (name === 'users')     renderUserManagement();
+  if (name === 'edit')      renderEditPanel();
   if (name.indexOf('db-') === 0) renderDbPanel(name);
 }
 
@@ -1301,6 +1327,7 @@ function renderPipelineTable(data) {
   if(!data||!data.length){tbody.innerHTML='<tr><td colspan="9"><div class="empty"><div class="empty-icon">📋</div><div class="empty-text">No active records</div></div></td></tr>';return;}
   var html='';
   data.forEach(function(r){
+    var editTd=isAdmin?('<td>'+btn('btn-secondary btn-sm','openEditFromPipeline("'+r.ID+'")','✏ Edit')+'</td>'):'<td></td>';
     var delTd=isAdmin?('<td>'+btn('btn-danger btn-sm','delRecord("'+r.ID+'")','Del')+'</td>'):'<td></td>';
     html+='<tr>'
       +'<td><span class="id-chip">'+r.ID.toString().slice(-8)+'</span></td>'
@@ -1311,7 +1338,7 @@ function renderPipelineTable(data) {
       +'<td class="mono">'+(r.BAGS||'—')+'</td>'
       +'<td class="mono">'+(r.LORRY_NO||'—')+'</td>'
       +'<td>'+statusBadge(r.STATUS)+' <span style="font-size:10px;color:var(--muted);margin-left:4px">→ '+waitFor(r.STATUS)+'</span></td>'
-      +delTd+'</tr>';
+      +editTd+delTd+'</tr>';
   });
   tbody.innerHTML=html;
 }
@@ -1915,6 +1942,298 @@ function toast(msg,type){
   var el=document.getElementById('toast');
   el.textContent=msg;el.className='show '+(type||'');
   clearTimeout(_tt);_tt=setTimeout(function(){el.className='';},3500);
+}
+
+// ════════════════════════════════════════════════════════════
+// EDIT RECORD — Admin / SuperAdmin can edit ANY field
+// ════════════════════════════════════════════════════════════
+function renderEditPanel() {
+  document.getElementById('edit-record-content').innerHTML = '';
+  document.getElementById('edit-search-results').innerHTML = '';
+  var inp = document.getElementById('edit-search-do');
+  if (inp) inp.value = '';
+}
+
+function editSearchDO() {
+  var q = (document.getElementById('edit-search-do')||{}).value.trim().toLowerCase();
+  var el = document.getElementById('edit-search-results'); if(!el) return;
+  if (!q) { el.innerHTML = ''; return; }
+  var found = records.filter(function(r){ return String(r.DO_NO||'').toLowerCase().includes(q); });
+  if (!found.length) { el.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:8px 0;">No matching DO found in active records.</div>'; return; }
+  var html = '<div style="display:flex;flex-direction:column;gap:6px;">';
+  found.forEach(function(r){
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--offwhite);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;" onclick="loadRecordForEdit(\''+r.ID+'\')">'
+      +'<span style="font-family:var(--mono);font-weight:700;color:var(--amber)">'+r.DO_NO+'</span>'
+      +'<span style="font-size:11px;color:var(--muted)">'+statusBadge(r.STATUS)+'</span>'
+      +'<span style="font-size:11px;color:var(--text2);">'+(r.CONSIGNOR_NAME||'')+'</span>'
+      +'<span style="font-size:11px;color:var(--text2);">'+(r.LORRY_NO||'—')+'</span>'
+      +'<button class="btn btn-amber btn-sm" style="margin-left:auto">✏ Edit This</button>'
+      +'</div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function openEditFromPipeline(id) {
+  showPanel('edit');
+  setTimeout(function(){ loadRecordForEdit(id); }, 100);
+}
+
+async function loadRecordForEdit(id) {
+  var rec = records.find(function(r){ return String(r.ID)===String(id); });
+  if (!rec) {
+    // Try fetching from DB directly
+    var r = await sb.from('transport_data').select('*').eq('id', id).single();
+    if (r.error || !r.data) { toast('Record not found','error'); return; }
+    rec = toUpper(r.data);
+  }
+  renderEditForm(rec);
+}
+
+function renderEditForm(rec) {
+  var el = document.getElementById('edit-record-content'); if(!el) return;
+
+  // Helper to make edit field
+  function ef(label, id, val, type) {
+    type = type || 'text';
+    if (type === 'select-party') {
+      var opts = '<option value="">Select...</option>';
+      (master.parties||[]).forEach(function(p){ opts += '<option'+(val===p.PARTY_NAME?' selected':'')+'>'+escHtml(p.PARTY_NAME||'')+'</option>'; });
+      return '<div class="form-group"><label>'+label+'</label><select id="ef-'+id+'">'+opts+'</select></div>';
+    }
+    if (type === 'select-dest') {
+      var opts2 = '<option value="">Select...</option>';
+      (master.destinations||[]).forEach(function(d){ opts2 += '<option'+(val===d.DESTINATION?' selected':'')+'>'+escHtml(d.DESTINATION||'')+'</option>'; });
+      return '<div class="form-group"><label>'+label+'</label><select id="ef-'+id+'" onchange="editDestChange()">'+opts2+'</select></div>';
+    }
+    if (type === 'select-broker') {
+      var opts3 = '<option value="">Select...</option>';
+      (master.brokers||[]).forEach(function(b){ opts3 += '<option'+(val===b.BROKER_NAME?' selected':'')+'>'+escHtml(b.BROKER_NAME||'')+'</option>'; });
+      return '<div class="form-group"><label>'+label+'</label><select id="ef-'+id+'" onchange="editBrokerChange()">'+opts3+'</select></div>';
+    }
+    if (type === 'select-account') {
+      var opts4 = '<option value="">Select...</option>';
+      (master.accounts||[]).forEach(function(a){ opts4 += '<option'+(val===a.HOLDER_NAME?' selected':'')+'>'+escHtml(a.HOLDER_NAME||'')+'</option>'; });
+      return '<div class="form-group"><label>'+label+'</label><select id="ef-'+id+'" onchange="editAdvHolderChange()">'+opts4+'</select></div>';
+    }
+    if (type === 'select-grade') {
+      var opts5 = '<option value="">Select...</option>';
+      (master.grades||[]).forEach(function(g){ opts5 += '<option'+(val===g.GRADE_CODE?' selected':'')+'>'+escHtml(g.GRADE_CODE||'')+'</option>'; });
+      return '<div class="form-group"><label>'+label+'</label><select id="ef-'+id+'">'+opts5+'</select></div>';
+    }
+    if (type === 'select-dca') {
+      var opts6 = '<option value="">Select...</option>';
+      (master.dcaList||[]).forEach(function(d){ opts6 += '<option'+(val===d.NAME?' selected':'')+'>'+escHtml(d.NAME||'')+'</option>'; });
+      return '<div class="form-group"><label>'+label+'</label><select id="ef-'+id+'">'+opts6+'</select></div>';
+    }
+    if (type === 'textarea') {
+      return '<div class="form-group full"><label>'+label+'</label><textarea id="ef-'+id+'" rows="2">'+escHtml(String(val||''))+'</textarea></div>';
+    }
+    return '<div class="form-group"><label>'+label+'</label><input type="'+type+'" id="ef-'+id+'" value="'+escHtml(String(val||''))+'"></div>';
+  }
+
+  function section(title, fields) {
+    return '<div class="form-block"><div class="form-block-title">'+title+'</div><div class="form-grid">'+fields.join('')+'</div></div>';
+  }
+
+  var html = '<div style="background:var(--navy);color:var(--white);border-radius:var(--radius2);padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">'
+    +'<span style="font-family:var(--mono);font-size:20px;font-weight:800;color:var(--amber2)">'+escHtml(rec.DO_NO||'')+'</span>'
+    +'<span>'+statusBadge(rec.STATUS)+'</span>'
+    +'<span style="font-size:11px;color:#8da5c4;">'+escHtml(rec.CONSIGNOR_NAME||'')+' → '+escHtml(rec.CONSIGNEE_NAME||'')+'</span>'
+    +'<button class="btn btn-amber" style="margin-left:auto" onclick="saveEditRecord(''+rec.ID+'')">💾 Save All Changes</button>'
+    +'</div>';
+
+  // Section 1 — Order
+  html += section('📋 Section 1 — Order Information', [
+    ef('Consignor Name', 'consignor_name', rec.CONSIGNOR_NAME, 'select-party'),
+    ef('Consignee Name', 'consignee_name', rec.CONSIGNEE_NAME, 'select-party'),
+    ef('SO No.', 'so_no', rec.SO_NO),
+    ef('SO Date', 'so_date', rec.SO_DATE, 'date'),
+    ef('SO Recv Time', 'so_recv_time', rec.SO_RECV_TIME, 'time'),
+    ef('Sold To Party', 'sold_to_party', rec.SOLD_TO_PARTY),
+    ef('Ship To Party', 'ship_to_party', rec.SHIP_TO_PARTY),
+    ef('DO No.', 'do_no', rec.DO_NO),
+    ef('Indent No.', 'indent_no', rec.INDENT_NO),
+    ef('Destination', 'destination', rec.DESTINATION, 'select-dest'),
+    ef('Unloading / UN Point', 'unloading', rec.UNLOADING),
+    ef('Bags', 'bags', rec.BAGS, 'number'),
+    ef('A-Qty MT', 'a_qty', rec.A_QTY, 'number'),
+    ef('C-Qty MT', 'c_qty', rec.C_QTY, 'number'),
+    ef('Grade', 'grade', rec.GRADE, 'select-grade'),
+    ef('DCA', 'dca', rec.DCA, 'select-dca'),
+  ]);
+
+  // Section 2 — Lorry
+  html += section('🚛 Section 2 — Lorry & Gate Pass', [
+    ef('Lorry No.', 'lorry_no', rec.LORRY_NO),
+    ef('Driver No.', 'driver_no', rec.DRIVER_NO),
+    ef('Lorry Placement', 'lorry_placement', rec.LORRY_PLACEMENT, 'datetime-local'),
+    ef('Lorry Starters', 'lorry_starters', rec.LORRY_STARTERS),
+    ef('GP No.', 'gp_no', rec.GP_NO),
+    ef('GP Time', 'gp_time', rec.GP_TIME),
+  ]);
+
+  // Section 3 — Freight
+  html += section('💰 Section 3 — Freight & Payment', [
+    ef('PMT Rate (₹/MT)', 'pmt_rate', rec.PMT_RATE, 'number'),
+    ef('Unloading & Others (₹)', 'unloading_others', rec.UNLOADING_OTHERS, 'number'),
+    ef('Total PMT', 'total_pmt', rec.TOTAL_PMT, 'number'),
+    ef('Total Freight', 'total_freight', rec.TOTAL_FREIGHT, 'number'),
+    ef('LM (₹)', 'lm', rec.LM, 'number'),
+    ef('PM (₹)', 'pm', rec.PM, 'number'),
+    ef('UN Exp (₹)', 'un_exp', rec.UN_EXP, 'number'),
+    ef('MF Freight', 'mf_freight', rec.MF_FREIGHT, 'number'),
+    ef('MRPL Diesel (₹)', 'mrpl_diesel', rec.MRPL_DIESEL, 'number'),
+    ef('BAL (₹)', 'bal', rec.BAL, 'number'),
+    ef('Advance', 'advance', rec.ADVANCE, 'number'),
+    ef('Total NEFT', 'total_neft', rec.TOTAL_NEFT, 'number'),
+    ef('Adv A/C Holder', 'adv_ac_holder', rec.ADV_AC_HOLDER, 'select-account'),
+    ef('Adv Acc No.', 'adv_acc_no', rec.ADV_ACC_NO),
+    ef('Adv IFSC', 'adv_ifsc', rec.ADV_IFSC),
+    ef('Bal A/C Holder', 'bal_ac_holder', rec.BAL_AC_HOLDER),
+    ef('Bal Acc No.', 'bal_acc_no', rec.BAL_ACC_NO),
+    ef('Bal IFSC', 'bal_ifsc', rec.BAL_IFSC),
+    ef('UN Point', 'un_point', rec.UN_POINT),
+    ef('Consignee Ref', 'consignee_ref', rec.CONSIGNEE_REF),
+  ]);
+
+  // Section 4 — Invoice
+  html += section('📄 Section 4 — Invoice & Documents', [
+    ef('Invoice No.', 'inv_no', rec.INV_NO),
+    ef('Invoice Date', 'inv_date', rec.INV_DATE, 'date'),
+    ef('Invoice Value (₹)', 'inv_value', rec.INV_VALUE, 'number'),
+    ef('LR No.', 'lr_no', rec.LR_NO),
+    ef('MF No.', 'mf_no', rec.MF_NO),
+    ef('E-Way Bill No.', 'eway_bill_no', rec.EWAY_BILL_NO),
+    ef('E-Way Bill Expiry', 'eway_bill_exp', rec.EWAY_BILL_EXP, 'date'),
+    ef('Broker Name (U4)', 'broker_name_u4', rec.BROKER_NAME_U4, 'select-broker'),
+    ef('Broker No. (U4)', 'broker_no_u4', rec.BROKER_NO_U4),
+    ef('Lorry No. (U4)', 'lorry_no_u4', rec.LORRY_NO_U4),
+    ef('Driver No. (U4)', 'driver_no_u4', rec.DRIVER_NO_U4),
+    ef('UN Point (U4)', 'un_point_u4', rec.UN_POINT_U4),
+    ef('SO 1', 'so_1', rec.SO_1), ef('LR 1', 'lr_1', rec.LR_1),
+    ef('SO 2', 'so_2', rec.SO_2), ef('LR 2', 'lr_2', rec.LR_2),
+    ef('SO 3', 'so_3', rec.SO_3), ef('LR 3', 'lr_3', rec.LR_3),
+    ef('SO 4', 'so_4', rec.SO_4), ef('LR 4', 'lr_4', rec.LR_4),
+    ef('SO 5', 'so_5', rec.SO_5), ef('LR 5', 'lr_5', rec.LR_5),
+  ]);
+
+  // Section 5 — Tracking
+  html += section('📍 Section 5 — Tracking', [
+    ef('Broker Name (U5)', 'broker_name_u5', rec.BROKER_NAME_U5, 'select-broker'),
+    ef('Broker No. (U5)', 'broker_no_u5', rec.BROKER_NO_U5),
+  ]);
+
+  // Section 6 — Insurance
+  html += section('🛡 Section 6 — Insurance', [
+    ef('Unloading Date', 'unloading_date', rec.UNLOADING_DATE, 'date'),
+    ef('Lorry No. (U6)', 'lorry_no_u6', rec.LORRY_NO_U6),
+    ef('LR No. (U6)', 'lr_no_u6', rec.LR_NO_U6),
+    ef('MF No. (U6)', 'mf_no_u6', rec.MF_NO_U6),
+    ef('Invoice No. (U6)', 'inv_no_u6', rec.INV_NO_U6),
+    ef('Invoice Value (U6)', 'inv_value_u6', rec.INV_VALUE_U6, 'number'),
+    ef('Invoice Date (U6)', 'inv_date_u6', rec.INV_DATE_U6, 'date'),
+    ef('Insurance Number', 'ins_num', rec.INS_NUM, 'number'),
+    ef('Insurance Premium', 'ins_premium', rec.INS_PREMIUM, 'number'),
+    ef('Broker Name (U6)', 'broker_name_u6', rec.BROKER_NAME_U6, 'select-broker'),
+  ]);
+
+  // Section 7 — Billing
+  html += section('🧾 Section 7 — Billing', [
+    ef('Bill No.', 'bill_no', rec.BILL_NO),
+    ef('BR PMT Rate (₹/MT)', 'br_pmt_rate', rec.BR_PMT_RATE, 'number'),
+    ef('BR PMT Amount', 'br_pmt_amt', rec.BR_PMT_AMT, 'number'),
+    ef('Ref No.', 'ref_no', rec.REF_NO),
+    ef('Remarks', 'remarks', rec.REMARKS, 'textarea'),
+  ]);
+
+  // Status change
+  html += '<div class="form-block"><div class="form-block-title">⚙ Status Control</div><div class="form-grid">'
+    +'<div class="form-group"><label>Status</label><select id="ef-status">'
+    +['NEW','SEC1_DONE','SEC2_DONE','SEC3_DONE','SEC4_DONE','SEC5_DONE','SEC6_DONE','COMPLETE'].map(function(s){
+      return '<option'+(rec.STATUS===s?' selected':'')+'>'+s+'</option>';
+    }).join('')
+    +'</select></div></div></div>';
+
+  // Bottom save button
+  html += '<div style="padding:16px 0;">'
+    +'<button class="btn btn-amber" style="padding:12px 32px;font-size:14px;" onclick="saveEditRecord(''+rec.ID+'')">💾 Save All Changes to Database</button>'
+    +' <button class="btn btn-secondary" onclick="renderEditPanel()">Cancel</button>'
+    +'</div>';
+
+  el.innerHTML = html;
+  window._editRecId = rec.ID;
+}
+
+function editDestChange() {
+  var v = (document.getElementById('ef-destination')||{}).value;
+  var dest = (master.destinations||[]).find(function(d){ return d.DESTINATION===v; });
+  if (dest) { var el=document.getElementById('ef-unloading'); if(el) el.value=dest.UNLOADING_TYPE||''; }
+}
+function editBrokerChange() {
+  var sel = document.getElementById('ef-broker_name_u4'); if(!sel) return;
+  var b = (master.brokers||[]).find(function(x){ return x.BROKER_NAME===sel.value; });
+  var el = document.getElementById('ef-broker_no_u4'); if(el) el.value = b?b.BROKER_NO:'';
+}
+function editAdvHolderChange() {
+  var v = (document.getElementById('ef-adv_ac_holder')||{}).value;
+  var acc = (master.accounts||[]).find(function(a){ return a.HOLDER_NAME===v; });
+  if (acc) {
+    var an=document.getElementById('ef-adv_acc_no'); if(an) an.value=acc.ACCOUNT_NO||'';
+    var ai=document.getElementById('ef-adv_ifsc'); if(ai) ai.value=acc.IFSC_CODE||'';
+  }
+}
+
+async function saveEditRecord(id) {
+  var fields = [
+    'consignor_name','consignee_name','so_no','so_date','so_recv_time',
+    'sold_to_party','ship_to_party','do_no','indent_no','destination',
+    'unloading','bags','a_qty','c_qty','grade','dca',
+    'lorry_no','driver_no','lorry_placement','lorry_starters','gp_no','gp_time',
+    'pmt_rate','unloading_others','total_pmt','total_freight','lm','pm','un_exp',
+    'mf_freight','mrpl_diesel','bal','advance','total_neft',
+    'adv_ac_holder','adv_acc_no','adv_ifsc','bal_ac_holder','bal_acc_no','bal_ifsc',
+    'un_point','consignee_ref',
+    'inv_no','inv_date','inv_value','lr_no','mf_no','eway_bill_no','eway_bill_exp',
+    'broker_name_u4','broker_no_u4','lorry_no_u4','driver_no_u4','un_point_u4',
+    'so_1','lr_1','so_2','lr_2','so_3','lr_3','so_4','lr_4','so_5','lr_5',
+    'broker_name_u5','broker_no_u5',
+    'unloading_date','lorry_no_u6','lr_no_u6','mf_no_u6',
+    'inv_no_u6','inv_value_u6','inv_date_u6','ins_num','ins_premium','broker_name_u6',
+    'bill_no','br_pmt_rate','br_pmt_amt','ref_no','remarks','status'
+  ];
+  var numFields = ['bags','a_qty','c_qty','pmt_rate','unloading_others','total_pmt',
+    'total_freight','lm','pm','un_exp','mf_freight','mrpl_diesel','bal','advance',
+    'total_neft','inv_value','inv_value_u6','ins_num','ins_premium','br_pmt_rate','br_pmt_amt'];
+  var dateFields = ['so_date','inv_date','eway_bill_exp','inv_date_u6','unloading_date'];
+
+  var data = { updated_at: new Date().toISOString() };
+  fields.forEach(function(f) {
+    var el = document.getElementById('ef-' + f);
+    if (!el) return;
+    var val = el.value;
+    if (numFields.indexOf(f) >= 0) {
+      data[f] = val !== '' ? (parseFloat(val)||0) : null;
+    } else if (dateFields.indexOf(f) >= 0) {
+      data[f] = val || null;
+    } else {
+      data[f] = val || null;
+    }
+  });
+
+  setTopbar('Saving...');
+  try {
+    var r = await sb.from('transport_data').update(data).eq('id', id);
+    if (r.error) throw new Error(r.error.message);
+    await logActivity('ADMIN_EDIT', 'transport_data', id, data);
+    toast('Record saved successfully!', 'success');
+    await loadRecords();
+    // Reload the edit form with fresh data
+    await loadRecordForEdit(id);
+  } catch(e) {
+    toast('Save error: ' + e.message, 'error');
+  }
+  setTopbar('');
 }
 </script>
 </body>
