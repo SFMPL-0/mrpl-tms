@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>TMS — Transport Management</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 :root {
   --navy:#0f1e35;--navy2:#162944;--navy3:#1e3554;
@@ -280,7 +280,7 @@ textarea{resize:vertical;min-height:70px;}
     <div id="conn-status" style="font-size:10px;font-weight:700;padding:5px 10px;border-radius:4px;margin-bottom:12px;background:#fef3c7;color:#92400e;display:none;"></div>
     <div>
       <label for="login-email">Email Address</label>
-      <input type="email" id="login-email" placeholder="yourname@mrpltms.local" autocomplete="email">
+      <input type="text" id="login-email" placeholder="Email or Username" autocomplete="username">
       <label for="login-password">Password</label>
       <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
       <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In →</button>
@@ -518,37 +518,48 @@ var acData       = [];
 // AUTH — LOGIN / LOGOUT
 // ════════════════════════════════════════════════════════════
 async function doLogin() {
-  var email = (document.getElementById('login-email').value||'').trim();
-  var pass  = document.getElementById('login-password').value||'';
-  var btn   = document.getElementById('login-btn');
-  var errEl = document.getElementById('login-error');
-  errEl.style.display = 'none';
-  if (!email || !pass) { showLoginError('Enter email and password'); return; }
+  var emailOrUser = (document.getElementById('login-email').value||'').trim();
+  var pass        = document.getElementById('login-password').value||'';
+  var btn         = document.getElementById('login-btn');
+  errEl           = document.getElementById('login-error');
+  if (errEl) errEl.style.display = 'none';
+  if (!emailOrUser || !pass) { showLoginError('Enter email/username and password'); return; }
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Signing in…';
   try {
-    // Test connection first
-    var r = await sb.auth.signInWithPassword({ email: email, password: pass });
+    // Step 1: Look up user by email OR username in our users table
+    var q1 = await sb.from('users').select('*')
+      .or('email.eq.' + emailOrUser + ',username.eq.' + emailOrUser)
+      .eq('is_active', true)
+      .single();
+
+    if (q1.error || !q1.data) {
+      throw new Error('User not found. Check email/username or contact admin.');
+    }
+
+    var profile = q1.data;
+
+    // Step 2: Try Supabase Auth with their email
+    var authEmail = profile.email || emailOrUser;
+    var r = await sb.auth.signInWithPassword({ email: authEmail, password: pass });
+
     if (r.error) {
-      // Give specific error messages
-      var msg = r.error.message;
-      if (msg.includes('Invalid login')) msg = 'Wrong email or password. Check your Supabase Auth credentials.';
-      if (msg.includes('Email not confirmed')) msg = 'Email not confirmed. Go to Supabase Auth settings and disable email confirmation.';
-      if (msg.includes('fetch')) msg = 'Cannot connect to Supabase. Check your internet connection.';
-      throw new Error(msg);
-    }
-    // Try to get user profile
-    var prof = await sb.from('users').select('*').eq('id', r.data.user.id).single();
-    if (prof.error) {
-      // Profile missing — but auth worked. Auto-create basic profile
-      if (prof.error.code === 'PGRST116') {
-        throw new Error('Auth worked but user profile not found in users table. Run the INSERT SQL from the guide to add your profile.');
+      var msg = r.error.message || '';
+      if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('credentials')) {
+        throw new Error('Wrong password. Try again.');
       }
-      throw new Error('Profile error: ' + prof.error.message);
+      if (msg.toLowerCase().includes('email') && msg.toLowerCase().includes('confirm')) {
+        throw new Error('Email not confirmed. In Supabase: Authentication → Providers → Email → turn OFF Confirm email.');
+      }
+      if (msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('no rows')) {
+        throw new Error('Account not set up in Supabase Auth. Go to Supabase → Authentication → Users → Add user with email: ' + authEmail);
+      }
+      throw new Error('Login failed: ' + msg);
     }
-    if (!prof.data) throw new Error('Profile not found. Run INSERT SQL from guide.');
-    if (!prof.data.is_active) throw new Error('Account disabled. Contact admin.');
-    await bootApp(prof.data);
+
+    if (!profile.is_active) throw new Error('Account is disabled. Contact admin.');
+    await bootApp(profile);
+
   } catch(e) {
     showLoginError(e.message || 'Login failed');
     btn.disabled = false;
@@ -673,19 +684,22 @@ document.addEventListener('DOMContentLoaded', async function() {
   // Test Supabase connection
   var connEl = document.getElementById('conn-status');
   try {
+    // Test basic connection
     var test = await sb.auth.getSession();
-    if (test.error) throw new Error(test.error.message);
-    if (connEl) { connEl.style.display='none'; }
+    if (connEl) connEl.style.display = 'none';
     // Restore session if exists
-    if (test.data.session) {
+    if (test.data && test.data.session) {
       try {
         var prof = await sb.from('users').select('*').eq('id', test.data.session.user.id).single();
-        if (prof.data && prof.data.is_active) await bootApp(prof.data);
-      } catch(e) { /* session expired or profile missing */ }
+        if (prof.data && prof.data.is_active) { await bootApp(prof.data); return; }
+      } catch(e) {
+        // Profile not found — sign out silently
+        await sb.auth.signOut();
+      }
     }
   } catch(e) {
     if (connEl) {
-      connEl.textContent = '⚠ Cannot connect to Supabase: ' + e.message;
+      connEl.textContent = '⚠ Connection error: ' + e.message + '. Check your Supabase URL and key.';
       connEl.style.display = 'block';
       connEl.style.background = '#fef2f2';
       connEl.style.color = '#b91c1c';
