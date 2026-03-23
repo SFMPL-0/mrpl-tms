@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>TMS — Transport Management</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
 <style>
 :root {
   --navy:#0f1e35;--navy2:#162944;--navy3:#1e3554;
@@ -483,10 +483,10 @@ textarea{resize:vertical;min-height:70px;}
 // ════════════════════════════════════════════════════════════
 // SUPABASE CONFIG — REPLACE WITH YOUR VALUES
 // ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// SUPABASE CONFIG
+// ════════════════════════════════════════════════════════════
 const SUPA_URL = 'https://tcsbvrezahefdobwzojg.supabase.co';
-// NOTE: Use the LEGACY anon key (eyJ...) from:
-// Supabase → Settings → API → "Legacy anon, service_role API keys" tab
-// The sb_publishable_ key does NOT work with the JS SDK for auth
 const SUPA_KEY = 'sb_publishable_1xt6-y0diVylBDhBk-Uuhg_ieZh3OZk';
 
 const { createClient } = supabase;
@@ -494,7 +494,8 @@ const sb = createClient(SUPA_URL, SUPA_KEY, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false
+    detectSessionInUrl: false,
+    flowType: 'pkce'
   }
 });
 
@@ -528,11 +529,15 @@ async function doLogin() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Signing in…';
   try {
+    console.log('Attempting login for:', email);
     var r = await sb.auth.signInWithPassword({ email: email, password: pass });
-    if (r.error) throw new Error(r.error.message);
-    // Login worked — build a basic profile directly from auth data
-    // No users table needed at all
-    var uid = r.data.user.id;
+    console.log('Auth response:', JSON.stringify(r));
+    if (r.error) {
+      console.error('Auth error:', r.error);
+      throw new Error('AUTH ERROR: ' + r.error.message + ' (code: ' + (r.error.status||r.error.code||'unknown') + ')');
+    }
+    if (!r.data || !r.data.user) throw new Error('No user data returned from Supabase');
+    var uid    = r.data.user.id;
     var uEmail = r.data.user.email || email;
     var profile = {
       id: uid,
@@ -543,18 +548,15 @@ async function doLogin() {
       section: null,
       is_active: true
     };
-    // Try to get richer profile from users table — but don't fail if table missing
+    // Try to get profile from users table — silently ignore if table missing
     try {
       var prof = await sb.from('users').select('*').eq('id', uid).maybeSingle();
       if (prof.data) profile = prof.data;
-    } catch(e) { /* users table not created yet — use basic profile */ }
+    } catch(e) { console.log('users table not found, using basic profile'); }
     await bootApp(profile);
   } catch(e) {
-    var msg = e.message || 'Login failed';
-    if (msg.includes('Invalid login') || msg.includes('invalid_credentials')) msg = 'Wrong email or password.';
-    if (msg.includes('Email not confirmed')) msg = 'Email not confirmed. Go to Supabase Auth Providers and turn OFF Confirm Email.';
-    if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch')) msg = 'Cannot reach Supabase. Check internet connection.';
-    showLoginError(msg);
+    console.error('Login failed:', e);
+    showLoginError(e.message || 'Login failed — check console (F12) for details');
     btn.disabled = false;
     btn.innerHTML = 'Sign In →';
   }
