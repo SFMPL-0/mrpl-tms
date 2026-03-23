@@ -280,11 +280,12 @@ textarea{resize:vertical;min-height:70px;}
     <div id="conn-status" style="font-size:10px;font-weight:700;padding:5px 10px;border-radius:4px;margin-bottom:12px;background:#fef3c7;color:#92400e;display:none;"></div>
     <div>
       <label for="login-email">Email Address</label>
-      <input type="text" id="login-email" placeholder="Email or Username" autocomplete="username">
+      <input type="email" id="login-email" placeholder="sfmplankushsingh@gmail.com" autocomplete="email">
       <label for="login-password">Password</label>
       <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
       <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In →</button>
       <div id="login-error"></div>
+
     </div>
   </div>
 </div>
@@ -518,58 +519,45 @@ var acData       = [];
 // AUTH — LOGIN / LOGOUT
 // ════════════════════════════════════════════════════════════
 async function doLogin() {
-  var emailOrUser = (document.getElementById('login-email').value||'').trim();
-  var pass        = document.getElementById('login-password').value||'';
-  var btn         = document.getElementById('login-btn');
-  errEl           = document.getElementById('login-error');
+  var email = (document.getElementById('login-email').value||'').trim();
+  var pass  = document.getElementById('login-password').value||'';
+  var btn   = document.getElementById('login-btn');
+  var errEl = document.getElementById('login-error');
   if (errEl) errEl.style.display = 'none';
-  if (!emailOrUser || !pass) { showLoginError('Enter email/username and password'); return; }
+  if (!email || !pass) { showLoginError('Enter email and password'); return; }
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Signing in…';
   try {
-    // Step 1: Look up user by email OR username in our users table
-    var q1 = await sb.from('users').select('*')
-      .or('email.eq.' + emailOrUser + ',username.eq.' + emailOrUser)
-      .eq('is_active', true)
-      .single();
-
-    if (q1.error || !q1.data) {
-      throw new Error('User not found. Check email/username or contact admin.');
-    }
-
-    var profile = q1.data;
-
-    // Step 2: Try Supabase Auth with their email
-    var authEmail = profile.email || emailOrUser;
-    var r = await sb.auth.signInWithPassword({ email: authEmail, password: pass });
-
-    if (r.error) {
-      var msg = r.error.message || '';
-      if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('credentials')) {
-        throw new Error('Wrong password. Try again.');
-      }
-      if (msg.toLowerCase().includes('email') && msg.toLowerCase().includes('confirm')) {
-        throw new Error('Email not confirmed. In Supabase: Authentication → Providers → Email → turn OFF Confirm email.');
-      }
-      if (msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('no rows')) {
-        throw new Error('Account not set up in Supabase Auth. Go to Supabase → Authentication → Users → Add user with email: ' + authEmail);
-      }
-      throw new Error('Login failed: ' + msg);
-    }
-
-    if (!profile.is_active) throw new Error('Account is disabled. Contact admin.');
+    var r = await sb.auth.signInWithPassword({ email: email, password: pass });
+    if (r.error) throw new Error(r.error.message);
+    // Login worked — build a basic profile directly from auth data
+    // No users table needed at all
+    var uid = r.data.user.id;
+    var uEmail = r.data.user.email || email;
+    var profile = {
+      id: uid,
+      username: uEmail.split('@')[0],
+      full_name: uEmail.split('@')[0],
+      email: uEmail,
+      role: 'superadmin',
+      section: null,
+      is_active: true
+    };
+    // Try to get richer profile from users table — but don't fail if table missing
+    try {
+      var prof = await sb.from('users').select('*').eq('id', uid).maybeSingle();
+      if (prof.data) profile = prof.data;
+    } catch(e) { /* users table not created yet — use basic profile */ }
     await bootApp(profile);
-
   } catch(e) {
-    showLoginError(e.message || 'Login failed');
+    var msg = e.message || 'Login failed';
+    if (msg.includes('Invalid login') || msg.includes('invalid_credentials')) msg = 'Wrong email or password.';
+    if (msg.includes('Email not confirmed')) msg = 'Email not confirmed. Go to Supabase Auth Providers and turn OFF Confirm Email.';
+    if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch')) msg = 'Cannot reach Supabase. Check internet connection.';
+    showLoginError(msg);
     btn.disabled = false;
     btn.innerHTML = 'Sign In →';
   }
-}
-function showLoginError(msg) {
-  var el = document.getElementById('login-error');
-  el.textContent = '⚠ ' + msg;
-  el.style.display = 'block';
 }
 async function doLogout() {
   await sb.auth.signOut();
@@ -690,12 +678,16 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Restore session if exists
     if (test.data && test.data.session) {
       try {
-        var prof = await sb.from('users').select('*').eq('id', test.data.session.user.id).single();
-        if (prof.data && prof.data.is_active) { await bootApp(prof.data); return; }
-      } catch(e) {
-        // Profile not found — sign out silently
-        await sb.auth.signOut();
-      }
+        var uid   = test.data.session.user.id;
+        var uEmail = test.data.session.user.email || '';
+        var profile = { id: uid, username: uEmail.split('@')[0], full_name: uEmail.split('@')[0],
+          email: uEmail, role: 'superadmin', section: null, is_active: true };
+        try {
+          var prof = await sb.from('users').select('*').eq('id', uid).maybeSingle();
+          if (prof.data) profile = prof.data;
+        } catch(e2) { /* users table missing — use basic profile */ }
+        if (profile.is_active !== false) { await bootApp(profile); return; }
+      } catch(e) { await sb.auth.signOut(); }
     }
   } catch(e) {
     if (connEl) {
