@@ -2095,7 +2095,7 @@ function renderEditForm(rec) {
     +'<span style="font-family:var(--mono);font-size:20px;font-weight:800;color:var(--amber2)">'+escHtml(rec.DO_NO||'')+'</span>'
     +'<span>'+statusBadge(rec.STATUS)+'</span>'
     +'<span style="font-size:11px;color:#8da5c4;">'+escHtml(rec.CONSIGNOR_NAME||'')+' → '+escHtml(rec.CONSIGNEE_NAME||'')+'</span>'
-    +'<button class="btn btn-amber" style="margin-left:auto" onclick="saveEditRecord(''+rec.ID+'')">💾 Save All Changes</button>'
+    +'<button class="btn btn-amber" style="margin-left:auto" onclick="saveEditRecord(\''+rec.ID+'\')">💾 Save All Changes</button>'
     +'</div>';
 
   // Section 1 — Order
@@ -2212,7 +2212,7 @@ function renderEditForm(rec) {
 
   // Bottom save button
   html += '<div style="padding:16px 0;">'
-    +'<button class="btn btn-amber" style="padding:12px 32px;font-size:14px;" onclick="saveEditRecord(''+rec.ID+'')">💾 Save All Changes to Database</button>'
+    +'<button class="btn btn-amber" style="padding:12px 32px;font-size:14px;" onclick="saveEditRecord(\''+rec.ID+'\')">💾 Save All Changes to Database</button>'
     +' <button class="btn btn-secondary" onclick="renderEditPanel()">Cancel</button>'
     +'</div>';
 
