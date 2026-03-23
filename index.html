@@ -504,7 +504,7 @@ const sb = createClient(SUPA_URL, SUPA_KEY, {
 // ════════════════════════════════════════════════════════════
 var currentUser  = null;
 var userRole     = null;
-var userSection  = null;
+var userSections = []; // array of section numbers this user can access
 var master       = {parties:[],destinations:[],brokers:[],accounts:[],grades:[],dcaList:[]};
 var records      = [];
 var archive      = [];
@@ -563,7 +563,7 @@ async function doLogin() {
 }
 async function doLogout() {
   await sb.auth.signOut();
-  currentUser = null; userRole = null; userSection = null;
+  currentUser = null; userRole = null; userSections = [];
   document.getElementById('app-screen').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('login-password').value = '';
@@ -576,14 +576,23 @@ async function doLogout() {
 async function bootApp(profile) {
   currentUser  = profile;
   userRole     = profile.role;
-  userSection  = profile.section;
+
+  // Support both old single 'section' and new 'sections' array
+  if (Array.isArray(profile.sections) && profile.sections.length) {
+    userSections = profile.sections.map(Number);
+  } else if (profile.section) {
+    userSections = [Number(profile.section)];
+  } else {
+    userSections = [];
+  }
 
   // Update last_login silently
   sb.from('users').update({ last_login: new Date().toISOString() }).eq('id', profile.id);
 
   // Update sidebar user pill
-  document.getElementById('sb-name').textContent  = profile.full_name;
-  document.getElementById('sb-role').textContent  = profile.role.toUpperCase() + (userSection ? ' · Sec ' + userSection : '');
+  var secLabel = userSections.length ? ' · Sec ' + userSections.join(',') : '';
+  document.getElementById('sb-name').textContent   = profile.full_name;
+  document.getElementById('sb-role').textContent   = profile.role.toUpperCase() + secLabel;
   document.getElementById('sb-avatar').textContent = profile.full_name.charAt(0).toUpperCase();
 
   // Show app FIRST, then apply role (so DOM exists)
@@ -593,10 +602,10 @@ async function bootApp(profile) {
   // Apply role visibility AFTER DOM is visible
   applyRoleUI();
 
-  // If user role, immediately show their section
-  if (userRole === 'user' && userSection) {
+  // If user role with sections, show their first section; else dashboard
+  if (userRole === 'user' && userSections.length > 0) {
     await loadAll();
-    showUserSection(userSection);
+    showUserSection(userSections[0]);
   } else {
     await loadAll();
     showPanel('dashboard');
@@ -633,11 +642,11 @@ function applyRoleUI() {
     el.style.display = isAdmin ? 'table-cell' : 'none';
   });
 
-  // Regular user — hide all other section buttons
+  // Regular user — show only their assigned sections in sidebar
   if (userRole === 'user') {
     for (var i = 1; i <= 7; i++) {
       var navBtn = document.getElementById('nav-sec' + i);
-      if (navBtn) navBtn.style.display = (i === userSection) ? 'flex' : 'none';
+      if (navBtn) navBtn.style.display = (userSections.indexOf(i) >= 0) ? 'flex' : 'none';
     }
   }
 }
@@ -761,9 +770,9 @@ function showPanel(name) {
 }
 
 function showUserSection(n) {
-  // Security: regular users can only access their own section
-  if (userRole === 'user' && userSection && n !== userSection) {
-    toast('Access denied — you can only access your section', 'error');
+  // Security: regular users can only access their assigned sections
+  if (userRole === 'user' && userSections.length > 0 && userSections.indexOf(n) < 0) {
+    toast('Access denied — you are not assigned to Section ' + n, 'error');
     return;
   }
   activeUser = n;
@@ -788,8 +797,11 @@ function getPendingForUser(n) {
   var filter;
   if (n === 6) {
     filter = function(r){ var s=String(r.STATUS||'').trim(); return s==='SEC4_DONE'||s==='SEC5_DONE'; };
+  } else if (n === 2) {
+    // SEC1_DONE = normal flow. Also accept NEW for backwards compatibility
+    filter = function(r){ var s=String(r.STATUS||'').trim(); return s==='SEC1_DONE'||s==='NEW'; };
   } else {
-    var needStatus = {2:'SEC1_DONE',3:'SEC2_DONE',4:'SEC3_DONE',7:'SEC6_DONE'};
+    var needStatus = {3:'SEC2_DONE',4:'SEC3_DONE',7:'SEC6_DONE'};
     var st = needStatus[n]; if (!st) return [];
     filter = function(r){ return String(r.STATUS||'').trim()===st; };
   }
@@ -1209,7 +1221,7 @@ async function saveUser1() {
     {toast('Fill Consignor, Consignee, DO No, Destination and Bags','error');return;}
   var bags=nv('f1-bags'),qty=+(bags/40).toFixed(3);
   var data={
-    status:'NEW',
+    status:'SEC1_DONE',
     consignor_name:v('f1-consignor'),consignee_name:v('f1-consignee'),
     so_no:v('f1-so-no'),so_date:v('f1-so-date')||null,
     so_recv_time:v('f1-so-recv'),
@@ -1927,9 +1939,11 @@ async function renderUserManagement(){
     document.getElementById('um-count').textContent=users.length+' Users';
     var html='';
     users.forEach(function(u){
-      var isDisabled=!u.is_active;
+      var secArr = Array.isArray(u.sections) && u.sections.length ? u.sections : (u.section ? [u.section] : []);
+      var secText = secArr.length ? ' · Sec ' + secArr.join(', ') : '';
+      var isDisabled = !u.is_active;
       html+='<div class="um-card'+(isDisabled?' um-disabled':'')+'"><div class="um-card-name">'+escHtml(u.full_name||'')+'</div>'
-        +'<div class="um-card-role '+u.role+'">'+u.role.toUpperCase()+(u.section?' · Section '+u.section:'')+'</div>'
+        +'<div class="um-card-role '+u.role+'">'+u.role.toUpperCase()+secText+'</div>'
         +'<div class="um-card-info">@'+escHtml(u.username||'')+' · '+escHtml(u.email||'')+'<br>Last login: '+(u.last_login?new Date(u.last_login).toLocaleString('en-IN'):'Never')+'</div>'
         +'<div class="um-card-actions">'
         +(isDisabled
@@ -1953,14 +1967,29 @@ async function umEnable(id){
 function openAddUserModal(){
   document.getElementById('modal-title').textContent='Add New User';
   document.getElementById('modal-body').innerHTML=
-    '<div style="background:var(--amberlt);border:1px solid #fcd34d;border-radius:var(--radius);padding:10px 14px;font-size:11px;font-weight:600;color:#92400e;margin-bottom:16px;">⚠ Step 1: Create the user in Supabase Dashboard → Authentication → Users first. Then copy their UUID and fill this form to link them to the system.</div>'
+    '<div style="background:var(--amberlt);border:1px solid #fcd34d;border-radius:var(--radius);padding:10px 14px;font-size:11px;font-weight:600;color:#92400e;margin-bottom:16px;">⚠ Step 1: Create the user in Supabase Dashboard → Authentication → Users first. Then copy their UUID and fill this form.</div>'
     +'<div class="form-grid">'
     +'<div class="form-group full"><label>Auth UUID (from Supabase Dashboard) *</label><input id="nu-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></div>'
-    +'<div class="form-group"><label>Username *</label><input id="nu-username" placeholder="e.g. section2"></div>'
+    +'<div class="form-group"><label>Username *</label><input id="nu-username" placeholder="e.g. rahul"></div>'
     +'<div class="form-group"><label>Full Name *</label><input id="nu-name" placeholder="Full Name"></div>'
-    +'<div class="form-group"><label>Email *</label><input type="email" id="nu-email" placeholder="user@mrpltms.local"></div>'
-    +'<div class="form-group"><label>Role *</label><select id="nu-role" onchange="umToggleSection()"><option value="user">User</option><option value="admin">Admin</option><option value="superadmin">Super Admin</option></select></div>'
-    +'<div class="form-group" id="nu-sec-group"><label>Section (for User role) *</label><select id="nu-section"><option value="">Select...</option><option value="1">Section 1 — Order</option><option value="2">Section 2 — Lorry</option><option value="3">Section 3 — Freight</option><option value="4">Section 4 — Invoice</option><option value="5">Section 5 — Tracking</option><option value="6">Section 6 — Insurance</option><option value="7">Section 7 — Billing</option></select></div>'
+    +'<div class="form-group full"><label>Email *</label><input type="email" id="nu-email" placeholder="user@mrpltms.local"></div>'
+    +'<div class="form-group full"><label>Role *</label>'
+    +'<select id="nu-role" onchange="umToggleSection()" style="max-width:280px">'
+    +'<option value="user">User (Section access only)</option>'
+    +'<option value="admin">Admin (All sections + Master Data + Reports)</option>'
+    +'<option value="superadmin">Super Admin (Full access + User Management)</option>'
+    +'</select></div>'
+    +'<div class="form-group full" id="nu-sec-group">'
+    +'<label>Sections This User Can Access * (tick all that apply)</label>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:8px;padding:12px;background:var(--offwhite);border:1px solid var(--border);border-radius:var(--radius);">'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;text-transform:none;letter-spacing:0;cursor:pointer"><input type="checkbox" id="nu-sec-1" value="1" style="width:16px;height:16px;accent-color:var(--amber)"> Section 1 — Order Entry</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;text-transform:none;letter-spacing:0;cursor:pointer"><input type="checkbox" id="nu-sec-2" value="2" style="width:16px;height:16px;accent-color:var(--amber)"> Section 2 — Lorry & Gate Pass</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;text-transform:none;letter-spacing:0;cursor:pointer"><input type="checkbox" id="nu-sec-3" value="3" style="width:16px;height:16px;accent-color:var(--amber)"> Section 3 — Freight & Payment</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;text-transform:none;letter-spacing:0;cursor:pointer"><input type="checkbox" id="nu-sec-4" value="4" style="width:16px;height:16px;accent-color:var(--amber)"> Section 4 — Invoice & Docs</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;text-transform:none;letter-spacing:0;cursor:pointer"><input type="checkbox" id="nu-sec-5" value="5" style="width:16px;height:16px;accent-color:var(--amber)"> Section 5 — Tracking</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;text-transform:none;letter-spacing:0;cursor:pointer"><input type="checkbox" id="nu-sec-6" value="6" style="width:16px;height:16px;accent-color:var(--amber)"> Section 6 — Insurance</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;text-transform:none;letter-spacing:0;cursor:pointer"><input type="checkbox" id="nu-sec-7" value="7" style="width:16px;height:16px;accent-color:var(--amber)"> Section 7 — Billing</label>'
+    +'</div></div>'
     +'</div>'
     +'<div class="form-actions">'
     +'<button class="btn btn-amber" onclick="umCreateUser()">Create User</button>'
@@ -1971,22 +2000,39 @@ function openAddUserModal(){
 function umToggleSection(){
   var role=document.getElementById('nu-role').value;
   var secGrp=document.getElementById('nu-sec-group');
-  if(secGrp) secGrp.style.display=role==='user'?'':'none';
+  if(secGrp) secGrp.style.display=role==='user'?'block':'none';
 }
 async function umCreateUser(){
-  var id=(document.getElementById('nu-id')||{}).value.trim();
-  var username=(document.getElementById('nu-username')||{}).value.trim();
-  var name=(document.getElementById('nu-name')||{}).value.trim();
-  var email=(document.getElementById('nu-email')||{}).value.trim();
-  var role=(document.getElementById('nu-role')||{}).value;
-  var section=parseInt((document.getElementById('nu-section')||{}).value)||null;
-  if(!id||!username||!name||!email){toast('Fill all required fields','error');return;}
-  if(role==='user'&&!section){toast('Select a section for user role','error');return;}
+  var id       = (document.getElementById('nu-id')||{}).value.trim();
+  var username = (document.getElementById('nu-username')||{}).value.trim();
+  var name     = (document.getElementById('nu-name')||{}).value.trim();
+  var email    = (document.getElementById('nu-email')||{}).value.trim();
+  var role     = (document.getElementById('nu-role')||{}).value;
+
+  // Collect checked sections
+  var sections = [];
+  for (var i = 1; i <= 7; i++) {
+    var cb = document.getElementById('nu-sec-'+i);
+    if (cb && cb.checked) sections.push(i);
+  }
+
+  if (!id||!username||!name||!email) { toast('Fill all required fields','error'); return; }
+  if (role==='user' && sections.length===0) { toast('Tick at least one section for User role','error'); return; }
+
   setTopbar('Creating...');
   try {
-    var r=await sb.from('users').insert({id,username,full_name:name,email,role,section:section||null,is_active:true,password_hash:'managed-by-supabase-auth',created_at:new Date().toISOString()});
-    if(r.error) throw new Error(r.error.message);
-    closeModal(); toast('User '+username+' created!','success'); renderUserManagement();
+    var r = await sb.from('users').insert({
+      id, username, full_name:name, email, role,
+      sections: role==='user' ? sections : null,
+      section:  role==='user' ? sections[0] : null, // keep old column for compatibility
+      is_active: true,
+      password_hash: 'managed-by-supabase-auth',
+      created_at: new Date().toISOString()
+    });
+    if (r.error) throw new Error(r.error.message);
+    closeModal();
+    toast('User '+username+' created with '+(role==='user'?sections.length+' section(s)':'full access')+'!','success');
+    renderUserManagement();
   } catch(e){ toast('Error: '+e.message,'error'); }
   setTopbar('');
 }
