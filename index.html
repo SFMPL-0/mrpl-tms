@@ -1,0 +1,1921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>TMS — Transport Management</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --navy:#0f1e35;--navy2:#162944;--navy3:#1e3554;
+  --amber:#d97706;--amber2:#f59e0b;--amberbg:#fffbeb;--amberlt:#fef3c7;
+  --white:#ffffff;--offwhite:#f8f7f5;--canvas:#f3f2ef;
+  --border:#e2ddd8;--border2:#ccc8c2;--text:#1a1614;--text2:#4a4540;--muted:#8c8680;
+  --green:#15803d;--greenbg:#f0fdf4;--red:#b91c1c;--redbg:#fef2f2;
+  --blue:#1d4ed8;--bluebg:#eff6ff;--card:#ffffff;
+  --radius:6px;--radius2:10px;
+  --mono:'JetBrains Mono',monospace;--sans:'Nunito Sans',sans-serif;
+  --shadow:0 1px 3px rgba(15,30,53,.1);--shadow2:0 4px 16px rgba(15,30,53,.12);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--sans);background:var(--canvas);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+
+/* ── LOGIN SCREEN ── */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--navy);}
+.login-card{background:var(--white);border-radius:14px;padding:40px 44px;width:380px;box-shadow:0 8px 40px rgba(0,0,0,.3);}
+.login-logo-eyebrow{font-size:9px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--amber2);margin-bottom:8px;}
+.login-logo-name{font-size:26px;font-weight:800;color:var(--navy);line-height:1.1;letter-spacing:-.02em;margin-bottom:4px;}
+.login-logo-sub{font-size:11px;color:var(--muted);margin-bottom:28px;}
+.login-card label{font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:5px;}
+.login-card input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius);font-family:var(--sans);font-size:13px;color:var(--text);background:var(--white);outline:none;margin-bottom:14px;}
+.login-card input:focus{border-color:var(--amber);box-shadow:0 0 0 3px rgba(217,119,6,.12);}
+.login-btn{width:100%;padding:12px;background:var(--amber);color:var(--white);border:none;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);letter-spacing:.02em;margin-top:4px;}
+.login-btn:hover{background:var(--amber2);}
+.login-btn:active{background:#b45309;}
+.login-btn:disabled{opacity:.6;cursor:default;}
+#login-error{font-size:11px;font-weight:700;color:var(--red);background:var(--redbg);border:1px solid #fca5a5;border-radius:var(--radius);padding:9px 12px;margin-top:8px;display:none;}
+.login-role-badge{display:inline-block;background:var(--navy);color:#8da5c4;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:4px;margin-top:16px;}
+
+/* ── MAIN APP ── */
+#app-screen{display:none;}
+.app{display:flex;height:100vh;overflow:hidden;}
+.sidebar{width:224px;background:var(--navy);display:flex;flex-direction:column;flex-shrink:0;}
+.main{flex:1;overflow-y:auto;display:flex;flex-direction:column;background:var(--canvas);}
+
+/* ── SIDEBAR ── */
+.logo{padding:22px 20px 14px;border-bottom:1px solid var(--navy3);}
+.logo-eyebrow{font-size:9px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--amber2);margin-bottom:6px;}
+.logo-name{font-size:18px;font-weight:800;color:var(--white);line-height:1.2;letter-spacing:-.01em;}
+.logo-version{font-family:var(--mono);font-size:9px;color:var(--navy3);background:var(--navy2);padding:2px 6px;border-radius:3px;display:inline-block;margin-top:5px;}
+.user-pill{margin:0 12px;padding:8px 10px;background:var(--navy2);border-radius:var(--radius);display:flex;align-items:center;gap:8px;}
+.user-pill-avatar{width:26px;height:26px;border-radius:50%;background:var(--amber);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--white);flex-shrink:0;}
+.user-pill-info{flex:1;min-width:0;}
+.user-pill-name{font-size:11px;font-weight:700;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.user-pill-role{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--amber2);}
+nav{flex:1;padding:8px 10px;overflow-y:auto;}
+.nav-section{margin-bottom:2px;}
+.nav-label{font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--navy3);padding:10px 10px 5px;}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--radius);cursor:pointer;color:#8da5c4;font-size:12px;font-weight:600;border:none;background:none;width:100%;text-align:left;transition:background .1s,color .1s;}
+.nav-item:hover{background:var(--navy2);color:#c8d8eb;}
+.nav-item.active{background:var(--amber);color:var(--white);}
+.nav-item.hidden-item{display:none;}
+.nav-icon{font-size:13px;width:18px;text-align:center;flex-shrink:0;opacity:.7;}
+.nav-divider{height:1px;background:var(--navy3);margin:8px 10px;}
+.sidebar-footer{padding:10px 12px;border-top:1px solid var(--navy3);display:flex;flex-direction:column;gap:6px;}
+.logout-btn{width:100%;padding:8px 12px;background:transparent;color:#8da5c4;border:1px solid var(--navy3);border-radius:var(--radius);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);}
+.logout-btn:hover{background:var(--redbg);color:var(--red);border-color:#fca5a5;}
+
+/* ── TOPBAR ── */
+.topbar{padding:0 24px;height:56px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--white);flex-shrink:0;}
+.page-title{font-size:15px;font-weight:800;color:var(--text);letter-spacing:-.01em;}
+.page-sub{font-size:11px;color:var(--muted);margin-top:1px;font-weight:400;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+
+/* ── CONTENT ── */
+.content{padding:20px 24px;flex:1;}
+.panel{display:none;}
+.panel.active{display:block;}
+
+/* ── ROLE VISIBILITY ── */
+.admin-only{display:none;}
+.superadmin-only{display:none;}
+
+/* ── STAT CARDS ── */
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px;}
+.stat-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius2);padding:16px 18px;}
+.stat-card-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
+.stat-card-val{font-size:28px;font-weight:800;font-family:var(--mono);color:var(--navy);margin-top:4px;letter-spacing:-.02em;}
+.stat-card-sub{font-size:10px;color:var(--muted);margin-top:3px;}
+
+/* ── PIPELINE BAR ── */
+.pipeline-wrap{background:var(--white);border:1px solid var(--border);border-radius:var(--radius2);padding:16px 18px;margin-bottom:18px;}
+.pipeline-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:12px;}
+.pipeline-steps{display:grid;grid-template-columns:repeat(7,1fr);gap:0;border:1px solid var(--border);border-radius:var(--radius);}
+.pipe-step{padding:10px 6px;text-align:center;border-right:1px solid var(--border);cursor:default;}
+.pipe-step:last-child{border-right:none;}
+.pipe-step-num{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--navy);display:block;line-height:1;}
+.pipe-step-label{font-size:9px;color:var(--muted);margin-top:4px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;}
+.pipe-step.has-items .pipe-step-num{color:var(--amber);}
+.pipe-step.has-items{background:var(--amberbg);}
+.pipe-step.completed{background:var(--greenbg);}
+.pipe-step.completed .pipe-step-num{color:var(--green);}
+
+/* ── CARDS ── */
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius2);padding:20px;box-shadow:var(--shadow);}
+.card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:14px;}
+
+/* ── TABLES ── */
+.tbl-wrap{overflow-x:auto;border-radius:var(--radius2);border:1px solid var(--border);box-shadow:var(--shadow);}
+table{width:100%;border-collapse:collapse;font-size:11px;background:var(--white);}
+thead th{background:var(--navy);color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:9px 12px;text-align:left;white-space:nowrap;}
+tbody tr{border-bottom:1px solid var(--border);}
+tbody tr:nth-child(even){background:var(--offwhite);}
+tbody tr:hover{background:var(--amberlt);}
+tbody td{padding:9px 12px;vertical-align:middle;}
+.id-chip{background:var(--navy2);color:#8da5c4;font-family:var(--mono);font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;}
+
+/* ── BADGES ── */
+.badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;display:inline-block;background:#e5e7eb;color:#374151;}
+.badge-amber{background:var(--amberlt);color:#92400e;}
+.badge-blue{background:var(--bluebg);color:var(--blue);}
+.badge-green{background:var(--greenbg);color:var(--green);}
+.badge-red{background:var(--redbg);color:var(--red);}
+
+/* ── BUTTONS ── */
+.btn{padding:7px 14px;border-radius:var(--radius);font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid transparent;font-family:var(--sans);letter-spacing:.02em;transition:opacity .1s;}
+.btn:disabled{opacity:.5;cursor:default;}
+.btn-primary{background:var(--navy);color:var(--white);}
+.btn-primary:hover:not(:disabled){background:var(--navy2);}
+.btn-secondary{background:var(--white);color:var(--text);border-color:var(--border2);}
+.btn-secondary:hover:not(:disabled){background:var(--offwhite);}
+.btn-amber{background:var(--amber);color:var(--white);}
+.btn-amber:hover:not(:disabled){background:var(--amber2);}
+.btn-danger{background:var(--redbg);color:var(--red);border-color:#fca5a5;}
+.btn-danger:hover:not(:disabled){background:#fee2e2;}
+.btn-success{background:var(--greenbg);color:var(--green);border-color:#86efac;}
+.btn-success:hover:not(:disabled){background:#dcfce7;}
+.btn-sm{padding:4px 10px;font-size:10px;}
+.search-row{display:flex;gap:10px;align-items:center;margin-bottom:14px;}
+.search-row input{flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius);font-family:var(--sans);font-size:12px;outline:none;}
+.search-row input:focus{border-color:var(--amber);}
+.form-actions{display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap;}
+
+/* ── DO SELECTOR ── */
+.do-selector{background:var(--white);border:1px solid var(--border);border-radius:var(--radius2);padding:18px;margin-bottom:16px;}
+.do-selector-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:12px;}
+.do-selector-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;}
+.do-ref{background:var(--offwhite);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-top:12px;display:none;}
+.do-ref.show{display:block;}
+.do-ref-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--amber);margin-bottom:8px;}
+.do-ref-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;}
+.do-ref-item{display:flex;flex-direction:column;gap:2px;}
+.do-ref-item-label{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+.do-ref-item-val{font-size:12px;font-weight:600;color:var(--text);}
+
+/* ── FORM BLOCKS ── */
+.form-block{background:var(--white);border:1px solid var(--border);border-radius:var(--radius2);padding:20px;margin-bottom:14px;box-shadow:var(--shadow);}
+.update-block{border-color:var(--amber);border-width:2px;}
+.form-block-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--amber);margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
+.form-group{display:flex;flex-direction:column;gap:5px;}
+.form-group.full{grid-column:1/-1;}
+label{font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;}
+input,select,textarea{padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius);font-family:var(--sans);font-size:12px;color:var(--text);background:var(--white);outline:none;width:100%;}
+input:focus,select:focus,textarea:focus{border-color:var(--amber);box-shadow:0 0 0 3px rgba(217,119,6,.1);}
+input[readonly],.calc-field,.readonly-field{background:var(--offwhite);color:var(--muted);cursor:default;}
+input[readonly]:focus,.calc-field:focus,.readonly-field:focus{border-color:var(--border);box-shadow:none;}
+textarea{resize:vertical;min-height:70px;}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(15,30,53,.55);z-index:100;display:none;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--white);border-radius:var(--radius2);padding:24px;width:min(520px,90vw);max-height:85vh;overflow-y:auto;box-shadow:var(--shadow2);}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.modal-title{font-size:14px;font-weight:800;color:var(--text);}
+.modal-close{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1;padding:4px 6px;border-radius:var(--radius);}
+.modal-close:hover{background:var(--canvas);color:var(--text);}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:20px;right:20px;background:var(--navy);color:var(--white);border-radius:var(--radius);padding:11px 16px;font-size:12px;font-weight:700;z-index:200;transform:translateY(60px);opacity:0;max-width:300px;box-shadow:var(--shadow2);transition:transform .2s,opacity .2s;}
+#toast.show{transform:translateY(0);opacity:1;}
+#toast.success{background:var(--green);}
+#toast.error{background:var(--red);}
+
+/* ── SPINNER ── */
+@keyframes spin{to{transform:rotate(360deg);}}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:var(--white);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;}
+
+/* ── EMPTY STATE ── */
+.empty{text-align:center;padding:48px 20px;color:var(--muted);}
+.empty-icon{font-size:30px;margin-bottom:10px;opacity:.5;}
+.empty-text{font-size:12px;font-weight:600;}
+
+/* ── TRACKING ── */
+.tracking-note{background:var(--amberlt);border:1px solid #fcd34d;border-radius:var(--radius);padding:10px 14px;font-size:11px;font-weight:600;color:#92400e;margin-bottom:14px;}
+
+/* ── MISC ── */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+.mono{font-family:var(--mono);font-size:12px;}
+.num-positive{color:var(--green);}
+
+/* ── ACCOUNT CHECK ── */
+.ac-email-bar{background:var(--white);border:1px solid var(--border);border-radius:var(--radius2);padding:16px 18px;margin-bottom:14px;box-shadow:var(--shadow);}
+.ac-email-row{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:12px;}
+.ac-filter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px;margin-bottom:12px;}
+.ac-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.ac-summary{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px;}
+.ac-sum-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius2);padding:12px 14px;box-shadow:var(--shadow);}
+.ac-sum-val{font-size:20px;font-weight:800;font-family:var(--mono);color:var(--navy);}
+.ac-sum-val.red{color:var(--red);}
+.ac-sum-val.amber{color:var(--amber);}
+.ac-sum-val.green{color:var(--green);}
+.ac-sum-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:3px;}
+.ac-table-wrap{overflow-x:auto;border-radius:var(--radius2);border:1px solid var(--border);box-shadow:var(--shadow);}
+.ac-table{width:100%;border-collapse:collapse;font-size:11px;background:var(--white);}
+.ac-table thead th{background:var(--navy);color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:9px 12px;text-align:left;white-space:nowrap;}
+.ac-table tbody tr{border-bottom:1px solid var(--border);}
+.ac-table tbody tr:nth-child(even){background:var(--offwhite);}
+.ac-table tbody tr:hover{background:var(--amberlt);}
+.ac-table tbody td{padding:10px 12px;vertical-align:middle;}
+.ac-table tfoot td{padding:9px 12px;background:var(--navy);color:#fff;font-size:10px;font-weight:700;font-family:var(--mono);}
+.ac-acc-block{display:flex;flex-direction:column;gap:1px;}
+.ac-acc-name{font-weight:700;font-size:11px;color:var(--text);}
+.ac-acc-no{font-family:var(--mono);font-size:10px;color:var(--text2);}
+.ac-acc-ifsc{font-size:10px;color:var(--muted);}
+.ac-cb-wrap{display:flex;flex-direction:column;gap:5px;}
+.ac-cb-row{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--text2);}
+.ac-cb-row input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--green);}
+.ac-cb-row input:disabled{opacity:.4;cursor:default;}
+.ac-days{font-size:9px;color:var(--muted);font-family:var(--mono);margin-top:2px;}
+.ac-badge-both{background:var(--redbg);color:var(--red);padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;}
+.ac-badge-bal{background:var(--bluebg);color:var(--blue);padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;}
+.ac-badge-adv{background:var(--amberlt);color:#92400e;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;}
+.ac-note{background:var(--amberlt);border:1px solid #fcd34d;border-radius:var(--radius);padding:10px 14px;font-size:11px;font-weight:600;color:#92400e;margin-bottom:14px;}
+
+/* ── REPORT ── */
+.rpt-filter-bar{background:var(--white);border:1px solid var(--border);border-radius:var(--radius2);padding:16px 18px;margin-bottom:16px;box-shadow:var(--shadow);}
+.rpt-filter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:12px;}
+.rpt-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.rpt-summary{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px;}
+.rpt-sum-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius2);padding:12px 14px;box-shadow:var(--shadow);}
+.rpt-sum-val{font-size:20px;font-weight:800;font-family:var(--mono);color:var(--navy);}
+.rpt-sum-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:3px;}
+.rpt-table-wrap{overflow-x:auto;border-radius:var(--radius2);border:1px solid var(--border);box-shadow:var(--shadow);}
+.rpt-table{width:100%;border-collapse:collapse;font-size:11px;background:var(--white);}
+.rpt-table thead th{background:var(--navy);color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:8px 10px;text-align:left;white-space:nowrap;}
+.rpt-table tbody tr{border-bottom:1px solid var(--border);}
+.rpt-table tbody tr:hover{background:var(--offwhite);}
+.rpt-table tfoot tr{background:var(--navy);border-top:2px solid var(--amber);}
+.rpt-table tfoot td{padding:8px 10px;font-size:10px;font-weight:700;color:#fff;font-family:var(--mono);}
+.tab-bar{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap;}
+.rpt-tab{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--white);color:var(--muted);}
+.rpt-tab.active{background:var(--navy);color:var(--white);border-color:var(--navy);}
+@media print{.sidebar,.topbar,.rpt-actions,.rpt-filter-bar,.tab-bar{display:none!important;}.main{overflow:visible!important;}.rpt-table-wrap{border:none;box-shadow:none;}.rpt-print-header{display:block!important;}}
+.rpt-print-header{display:none;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid var(--navy);}
+
+/* ── USER MANAGEMENT ── */
+.um-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:16px;}
+.um-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius2);padding:16px 18px;box-shadow:var(--shadow);}
+.um-card-name{font-size:14px;font-weight:800;color:var(--navy);margin-bottom:4px;}
+.um-card-role{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:2px 8px;border-radius:4px;margin-bottom:8px;}
+.um-card-role.superadmin{background:#fef3c7;color:#92400e;}
+.um-card-role.admin{background:var(--bluebg);color:var(--blue);}
+.um-card-role.user{background:var(--greenbg);color:var(--green);}
+.um-card-info{font-size:11px;color:var(--muted);margin-bottom:10px;}
+.um-card-actions{display:flex;gap:6px;}
+.um-disabled{opacity:.55;border-style:dashed;}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════ LOGIN ══════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo-eyebrow">Transport System</div>
+    <div class="login-logo-name">MRPL TMS</div>
+    <div class="login-logo-sub">Transport Management — Supabase Edition</div>
+    <div>
+      <label for="login-email">Email Address</label>
+      <input type="email" id="login-email" placeholder="yourname@mrpltms.local" autocomplete="email">
+      <label for="login-password">Password</label>
+      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In →</button>
+      <div id="login-error"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ MAIN APP ══════════════════════════ -->
+<div id="app-screen">
+<div id="toast"></div>
+<div class="app">
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-eyebrow">Transport System</div>
+      <div class="logo-name">MRPL<br>TMS</div>
+      <div class="logo-version">v3.0 · Supabase</div>
+    </div>
+
+    <div class="user-pill" style="margin:10px 12px 4px;">
+      <div class="user-pill-avatar" id="sb-avatar">?</div>
+      <div class="user-pill-info">
+        <div class="user-pill-name" id="sb-name">Loading...</div>
+        <div class="user-pill-role" id="sb-role">—</div>
+      </div>
+    </div>
+
+    <nav>
+      <div class="nav-section">
+        <div class="nav-label">Overview</div>
+        <button class="nav-item active" onclick="showPanel('dashboard')"><span class="nav-icon">▦</span> Dashboard</button>
+        <button class="nav-item" onclick="showPanel('pipeline')"><span class="nav-icon">⟶</span> DO Pipeline</button>
+        <button class="nav-item" onclick="showPanel('archive')"><span class="nav-icon">✓</span> Completed</button>
+      </div>
+      <div class="nav-divider"></div>
+      <div class="nav-section" id="nav-sections">
+        <div class="nav-label">User Sections</div>
+        <button class="nav-item" id="nav-sec1" onclick="showUserSection(1)"><span class="nav-icon">①</span> User 1 · Order</button>
+        <button class="nav-item" id="nav-sec2" onclick="showUserSection(2)"><span class="nav-icon">②</span> User 2 · Lorry</button>
+        <button class="nav-item" id="nav-sec3" onclick="showUserSection(3)"><span class="nav-icon">③</span> User 3 · Freight</button>
+        <button class="nav-item" id="nav-sec4" onclick="showUserSection(4)"><span class="nav-icon">④</span> User 4 · Invoice</button>
+        <button class="nav-item" id="nav-sec5" onclick="showUserSection(5)"><span class="nav-icon">⑤</span> User 5 · Tracking</button>
+        <button class="nav-item" id="nav-sec6" onclick="showUserSection(6)"><span class="nav-icon">⑥</span> User 6 · Insurance</button>
+        <button class="nav-item" id="nav-sec7" onclick="showUserSection(7)"><span class="nav-icon">⑦</span> User 7 · Billing</button>
+      </div>
+      <div class="nav-divider"></div>
+      <div class="nav-section admin-only">
+        <div class="nav-label">Master Data</div>
+        <button class="nav-item" onclick="showPanel('db-parties')"><span class="nav-icon">🏢</span> Parties</button>
+        <button class="nav-item" onclick="showPanel('db-destination')"><span class="nav-icon">📍</span> Destinations</button>
+        <button class="nav-item" onclick="showPanel('db-broker')"><span class="nav-icon">🤝</span> Brokers</button>
+        <button class="nav-item" onclick="showPanel('db-account')"><span class="nav-icon">🏦</span> Accounts</button>
+        <button class="nav-item" onclick="showPanel('db-dca')"><span class="nav-icon">📋</span> DCA</button>
+        <button class="nav-item" onclick="showPanel('db-grade')"><span class="nav-icon">🏷</span> Grades</button>
+      </div>
+      <div class="nav-divider admin-only"></div>
+      <div class="nav-section admin-only">
+        <div class="nav-label">Reports</div>
+        <button class="nav-item" onclick="showPanel('reports')"><span class="nav-icon">📊</span> Master Report</button>
+        <button class="nav-item" onclick="showPanel('accheck')"><span class="nav-icon">✅</span> Account Check</button>
+      </div>
+      <div class="nav-divider superadmin-only"></div>
+      <div class="nav-section superadmin-only">
+        <div class="nav-label">Admin</div>
+        <button class="nav-item" onclick="showPanel('users')"><span class="nav-icon">👤</span> User Management</button>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="doLogout()">⎋ Sign Out</button>
+    </div>
+  </aside>
+
+  <!-- ═══ MAIN ═══ -->
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title" id="page-title">Dashboard</div>
+        <div class="page-sub" id="page-sub">Overview of all transport records</div>
+      </div>
+      <div class="topbar-right" id="topbar-right"></div>
+    </div>
+
+    <div class="content">
+
+      <!-- DASHBOARD -->
+      <div id="panel-dashboard" class="panel active">
+        <div class="stats-row">
+          <div class="stat-card"><div class="stat-card-label">Active Records</div><div class="stat-card-val" id="s-total">—</div><div class="stat-card-sub">In pipeline</div></div>
+          <div class="stat-card"><div class="stat-card-label">Created Today</div><div class="stat-card-val" id="s-today">—</div><div class="stat-card-sub">New DOs today</div></div>
+          <div class="stat-card"><div class="stat-card-label">Completed</div><div class="stat-card-val" id="s-done">—</div><div class="stat-card-sub">Archived records</div></div>
+        </div>
+        <div class="pipeline-wrap">
+          <div class="pipeline-title">DO Pipeline — Waiting per Stage</div>
+          <div class="pipeline-steps">
+            <div class="pipe-step" id="ps-1"><span class="pipe-step-num" id="ps1">—</span><div class="pipe-step-label">U1 Order</div></div>
+            <div class="pipe-step" id="ps-2"><span class="pipe-step-num" id="ps2">—</span><div class="pipe-step-label">U2 Lorry</div></div>
+            <div class="pipe-step" id="ps-3"><span class="pipe-step-num" id="ps3">—</span><div class="pipe-step-label">U3 Freight</div></div>
+            <div class="pipe-step" id="ps-4"><span class="pipe-step-num" id="ps4">—</span><div class="pipe-step-label">U4 Invoice</div></div>
+            <div class="pipe-step" id="ps-5"><span class="pipe-step-num" id="ps5">—</span><div class="pipe-step-label">U5 Track</div></div>
+            <div class="pipe-step" id="ps-6"><span class="pipe-step-num" id="ps6">—</span><div class="pipe-step-label">U6 Insure</div></div>
+            <div class="pipe-step completed" id="ps-7"><span class="pipe-step-num" id="ps7">—</span><div class="pipe-step-label">Done</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Recent Records</div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>ID</th><th>DO No.</th><th>Consignor</th><th>Consignee</th><th>Destination</th><th>Lorry No.</th><th>Status</th></tr></thead>
+            <tbody id="dash-tbody"><tr><td colspan="7"><div class="empty"><div class="empty-icon">📋</div><div class="empty-text">No records yet</div></div></td></tr></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- DO PIPELINE -->
+      <div id="panel-pipeline" class="panel">
+        <div class="search-row">
+          <input type="text" id="pipe-search" placeholder="Search DO No, consignor, lorry…" oninput="filterPipeline()">
+          <button class="btn btn-secondary" onclick="loadRecords()">↻ Refresh</button>
+        </div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>ID</th><th>DO No.</th><th>Consignor</th><th>Consignee</th><th>Destination</th><th>Bags</th><th>Lorry No.</th><th>Waiting For</th><th class="admin-only"></th></tr></thead>
+          <tbody id="pipe-tbody"><tr><td colspan="9"><div class="empty"><div class="empty-icon">⟶</div><div class="empty-text">Loading...</div></div></td></tr></tbody>
+        </table></div>
+      </div>
+
+      <!-- COMPLETED / ARCHIVE -->
+      <div id="panel-archive" class="panel">
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>ID</th><th>DO No.</th><th>Consignor</th><th>Consignee</th><th>Destination</th><th>Lorry No.</th><th>Bags</th><th>Total Freight</th><th>BR PMT Amt</th><th>Completed</th></tr></thead>
+          <tbody id="archive-tbody"><tr><td colspan="10"><div class="empty"><div class="empty-icon">✓</div><div class="empty-text">No completed records yet</div></div></td></tr></tbody>
+        </table></div>
+      </div>
+
+      <!-- USER SECTION (shared) -->
+      <div id="panel-user" class="panel"><div id="user-section-content"></div></div>
+
+      <!-- DB PANELS -->
+      <div id="panel-db-parties"     class="panel"></div>
+      <div id="panel-db-destination" class="panel"></div>
+      <div id="panel-db-broker"      class="panel"></div>
+      <div id="panel-db-account"     class="panel"></div>
+      <div id="panel-db-dca"         class="panel"></div>
+      <div id="panel-db-grade"       class="panel"></div>
+      <div id="panel-reports"        class="panel"></div>
+      <div id="panel-accheck"        class="panel"></div>
+
+      <!-- USER MANAGEMENT (superadmin only) -->
+      <div id="panel-users" class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em" id="um-count">Users</div>
+          <button class="btn btn-amber" onclick="openAddUserModal()">+ Add User</button>
+        </div>
+        <div id="um-grid" class="um-grid"><div class="empty"><div class="empty-icon">👤</div><div class="empty-text">Loading users...</div></div></div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+</div><!-- /app-screen -->
+
+<!-- MODAL -->
+<div id="modal-overlay" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title"></div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// SUPABASE CONFIG — REPLACE WITH YOUR VALUES
+// ════════════════════════════════════════════════════════════
+const SUPA_URL = 'https://tcsbvrezahefdobwzojg.supabase.co';
+const SUPA_KEY = 'sb_publishable_1xt6-y0diVylBDhBk-Uuhg_ieZh3OZk';
+
+const { createClient } = supabase;
+const sb = createClient(SUPA_URL, SUPA_KEY);
+
+// ════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════
+var currentUser  = null;
+var userRole     = null;
+var userSection  = null;
+var master       = {parties:[],destinations:[],brokers:[],accounts:[],grades:[],dcaList:[]};
+var records      = [];
+var archive      = [];
+var pipeRecords  = [];
+var activeUser   = 1;
+var currentRecordId = null;
+var reportData   = [];
+var reportFilters= {};
+var activeRptTab = 'freight';
+var acData       = [];
+
+// ════════════════════════════════════════════════════════════
+// AUTH — LOGIN / LOGOUT
+// ════════════════════════════════════════════════════════════
+async function doLogin() {
+  var email = document.getElementById('login-email').value.trim();
+  var pass  = document.getElementById('login-password').value;
+  var btn   = document.getElementById('login-btn');
+  var errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  if (!email || !pass) { showLoginError('Enter email and password'); return; }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Signing in…';
+  try {
+    var r = await sb.auth.signInWithPassword({ email, password: pass });
+    if (r.error) throw new Error(r.error.message);
+    var prof = await sb.from('users').select('*').eq('id', r.data.user.id).single();
+    if (prof.error || !prof.data) throw new Error('Profile not found. Contact admin.');
+    if (!prof.data.is_active) throw new Error('Account disabled. Contact admin.');
+    await bootApp(prof.data);
+  } catch(e) {
+    showLoginError(e.message || 'Login failed');
+    btn.disabled = false;
+    btn.innerHTML = 'Sign In →';
+  }
+}
+function showLoginError(msg) {
+  var el = document.getElementById('login-error');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+async function doLogout() {
+  await sb.auth.signOut();
+  currentUser = null; userRole = null; userSection = null;
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-error').style.display = 'none';
+}
+
+// ════════════════════════════════════════════════════════════
+// BOOT
+// ════════════════════════════════════════════════════════════
+async function bootApp(profile) {
+  currentUser  = profile;
+  userRole     = profile.role;
+  userSection  = profile.section;
+
+  // Update last_login silently
+  sb.from('users').update({ last_login: new Date().toISOString() }).eq('id', profile.id);
+
+  // Update sidebar user pill
+  document.getElementById('sb-name').textContent  = profile.full_name;
+  document.getElementById('sb-role').textContent  = profile.role.toUpperCase() + (userSection ? ' · Sec ' + userSection : '');
+  document.getElementById('sb-avatar').textContent = profile.full_name.charAt(0).toUpperCase();
+
+  // Apply role visibility
+  applyRoleUI();
+
+  // Show app
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display   = 'block';
+
+  // If user role, immediately show their section
+  if (userRole === 'user' && userSection) {
+    await loadAll();
+    showUserSection(userSection);
+  } else {
+    await loadAll();
+    showPanel('dashboard');
+  }
+}
+
+function applyRoleUI() {
+  var isAdmin = userRole === 'admin' || userRole === 'superadmin';
+  var isSA    = userRole === 'superadmin';
+  document.querySelectorAll('.admin-only').forEach(function(el){ el.style.display = isAdmin ? '' : 'none'; });
+  document.querySelectorAll('.superadmin-only').forEach(function(el){ el.style.display = isSA ? '' : 'none'; });
+  // If regular user, hide section nav items that are not theirs
+  if (userRole === 'user') {
+    for (var i = 1; i <= 7; i++) {
+      var btn = document.getElementById('nav-sec' + i);
+      if (btn) btn.style.display = (i === userSection) ? '' : 'none';
+    }
+  }
+}
+
+async function loadAll() {
+  setTopbar('Loading...');
+  try {
+    var [parties, destinations, brokers, accounts, grades, dca] = await Promise.all([
+      sb.from('parties_db').select('*').eq('active', true),
+      sb.from('destination_db').select('*').eq('active', true),
+      sb.from('broker_db').select('*').eq('active', true),
+      sb.from('account_db').select('*').eq('active', true),
+      sb.from('grade_db').select('*').eq('active', true),
+      sb.from('dca_db').select('*').eq('active', true),
+    ]);
+    master.parties      = (parties.data || []).map(toUpper);
+    master.destinations = (destinations.data || []).map(toUpper);
+    master.brokers      = (brokers.data || []).map(toUpper);
+    master.accounts     = (accounts.data || []).map(toUpper);
+    master.grades       = (grades.data || []).map(toUpper);
+    master.dcaList      = (dca.data || []).map(toUpper);
+    await loadRecords();
+  } catch(e) {
+    toast('Load error: ' + e.message, 'error');
+  }
+  setTopbar('');
+}
+
+function toUpper(obj) {
+  var out = {};
+  Object.keys(obj).forEach(function(k){ out[k.toUpperCase()] = obj[k]; });
+  return out;
+}
+
+async function loadRecords() {
+  try {
+    var recs = await sb.from('transport_data').select('*').order('created_at', { ascending: false });
+    records = (recs.data || []).map(toUpper);
+    var arch = await sb.from('transport_archive').select('*').order('archived_at', { ascending: false });
+    archive = (arch.data || []).map(toUpper);
+    renderDashboard();
+    var pp = document.getElementById('panel-pipeline');
+    if (pp && pp.classList.contains('active')) { pipeRecords = records; renderPipelineTable(records); }
+  } catch(e) {
+    toast('Records load error: ' + e.message, 'error');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// CHECK SESSION ON PAGE LOAD
+// ════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async function() {
+  var sess = await sb.auth.getSession();
+  if (!sess.data.session) return;
+  try {
+    var prof = await sb.from('users').select('*').eq('id', sess.data.session.user.id).single();
+    if (prof.data && prof.data.is_active) await bootApp(prof.data);
+  } catch(e) { /* session expired */ }
+});
+
+// ════════════════════════════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════════════════════════════
+var panelMeta = {
+  'dashboard':      {title:'Dashboard',         sub:'Overview & pipeline status'},
+  'pipeline':       {title:'DO Pipeline',        sub:'All active delivery orders by stage'},
+  'archive':        {title:'Completed Records',  sub:'Archived completed DOs'},
+  'user':           {title:'',                   sub:''},
+  'db-parties':     {title:'Parties Master',     sub:'Consignors & Consignees'},
+  'db-destination': {title:'Destinations',       sub:'Destination to Unloading mapping'},
+  'db-broker':      {title:'Broker Master',      sub:'All brokers'},
+  'db-account':     {title:'Account Master',     sub:'Bank accounts for payments'},
+  'db-dca':         {title:'DCA Master',         sub:'DCA names list'},
+  'db-grade':       {title:'Grade Master',       sub:'Product grade codes'},
+  'reports':        {title:'Master Report',      sub:'Freight · Payment · Invoice · Insurance · Status · Summary'},
+  'accheck':        {title:'Account Check',      sub:'Track Advance & Balance payments'},
+  'users':          {title:'User Management',    sub:'Create & manage system users (Super Admin only)'},
+};
+
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.remove('active'); });
+  var panel = document.getElementById('panel-' + name);
+  if (panel) panel.classList.add('active');
+  var btnSel = document.querySelector('[onclick="showPanel(\'' + name + '\')"]');
+  if (btnSel) btnSel.classList.add('active');
+  var m = panelMeta[name] || {};
+  document.getElementById('page-title').textContent = m.title || name;
+  document.getElementById('page-sub').textContent   = m.sub   || '';
+  if (name === 'dashboard') loadRecords();
+  if (name === 'pipeline')  { loadRecords(); pipeRecords = records; renderPipelineTable(records); }
+  if (name === 'archive')   renderArchiveFromData();
+  if (name === 'reports')   showReportsPanel();
+  if (name === 'accheck')   showAccountCheckPanel();
+  if (name === 'users')     renderUserManagement();
+  if (name.indexOf('db-') === 0) renderDbPanel(name);
+}
+
+function showUserSection(n) {
+  // Security: regular users can only access their own section
+  if (userRole === 'user' && userSection && n !== userSection) {
+    toast('Access denied — you can only access your section', 'error');
+    return;
+  }
+  activeUser = n;
+  currentRecordId = null;
+  window._selectedRec = null;
+  document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.nav-item').forEach(function(x){ x.classList.remove('active'); });
+  document.getElementById('panel-user').classList.add('active');
+  var btn = document.getElementById('nav-sec' + n);
+  if (btn) btn.classList.add('active');
+  var titles = ['','Order Entry','Lorry & Gate Pass','Freight & Payment','Invoice & Documents','Tracking','Insurance','Billing'];
+  document.getElementById('page-title').textContent = 'User ' + n + ' — ' + titles[n];
+  document.getElementById('page-sub').textContent   = n === 1 ? 'Create new DO entry' : 'Select pending DO No. to fill your section';
+  renderUserForm(n);
+}
+
+// ════════════════════════════════════════════════════════════
+// DO SELECTOR
+// ════════════════════════════════════════════════════════════
+function getPendingForUser(n) {
+  if (n === 5) return [];
+  var filter;
+  if (n === 6) {
+    filter = function(r){ var s=String(r.STATUS||'').trim(); return s==='SEC4_DONE'||s==='SEC5_DONE'; };
+  } else {
+    var needStatus = {2:'SEC1_DONE',3:'SEC2_DONE',4:'SEC3_DONE',7:'SEC6_DONE'};
+    var st = needStatus[n]; if (!st) return [];
+    filter = function(r){ return String(r.STATUS||'').trim()===st; };
+  }
+  return records.filter(filter).map(function(r){
+    return {id:r.ID,do_no:r.DO_NO,consignor:r.CONSIGNOR_NAME,consignee:r.CONSIGNEE_NAME,
+            destination:r.DESTINATION,grade:r.GRADE||'',bags:r.BAGS,lorry:r.LORRY_NO||''};
+  });
+}
+
+function renderDOSelector(userNum, pendingDOs) {
+  if (userNum === 1) return '';
+  if (!pendingDOs.length) {
+    var dbg = records.length === 0
+      ? '<div style="color:var(--red);font-size:11px;margin-top:8px">No records loaded.</div>'
+      : '<div style="color:var(--amber);font-size:11px;margin-top:8px">'+records.length+' record(s) found but none ready for this section.</div>';
+    return '<div class="do-selector">'
+      +'<div class="do-selector-title">Select DO Number</div>'
+      +'<div class="empty" style="padding:20px"><div class="empty-icon">⏳</div>'
+      +'<div class="empty-text">No pending DOs for this section.</div></div>'
+      +dbg
+      +'<button class="btn btn-secondary" style="margin-top:8px" onclick="loadRecords().then(function(){renderUserForm('+userNum+')})">↻ Refresh</button>'
+      +'</div>';
+  }
+  var opts = '<option value="">— Select DO No. —</option>';
+  pendingDOs.forEach(function(d){
+    opts += '<option value="'+d.id+'" data-do="'+d.do_no+'" data-consignor="'+d.consignor
+          +'" data-consignee="'+d.consignee+'" data-dest="'+d.destination
+          +'" data-grade="'+d.grade+'" data-bags="'+d.bags+'" data-lorry="'+(d.lorry||'')+'">'
+          +d.do_no+' — '+d.consignee+(d.grade?' — '+d.grade:'')+' — '+d.destination+'</option>';
+  });
+  return '<div class="do-selector">'
+    +'<div class="do-selector-title">📋 Select DO Number — '+pendingDOs.length+' Pending</div>'
+    +'<div class="do-selector-row">'
+    +'<div class="form-group"><label>Pending DO Numbers</label>'
+    +'<select id="do-select" onchange="onDOSelect()">'+opts+'</select></div>'
+    +'<button class="btn btn-secondary" onclick="loadRecords().then(function(){renderUserForm('+userNum+')})">↻ Refresh</button>'
+    +'</div>'
+    +'<div class="do-ref" id="do-ref">'
+    +'<div class="do-ref-title">📌 Reference — User 1 Details (Read Only)</div>'
+    +'<div class="do-ref-grid" id="do-ref-grid"></div>'
+    +'</div></div>';
+}
+
+function onDOSelect() {
+  var sel = document.getElementById('do-select');
+  if (!sel || !sel.value) { var r=document.getElementById('do-ref'); if(r) r.classList.remove('show'); currentRecordId=null; window._selectedRec=null; return; }
+  currentRecordId = sel.value;
+  var ref  = document.getElementById('do-ref');
+  var grid = document.getElementById('do-ref-grid');
+  if (ref) ref.classList.add('show');
+  var rec = records.find(function(r){ return String(r.ID)===String(sel.value); });
+  if (rec && grid) {
+    var fields = [['DO No',rec.DO_NO],['Consignor',rec.CONSIGNOR_NAME],['Consignee',rec.CONSIGNEE_NAME],
+      ['SO No',rec.SO_NO],['Destination',rec.DESTINATION],['Unloading',rec.UNLOADING],
+      ['Bags',rec.BAGS],['A-Qty (MT)',rec.A_QTY?(+rec.A_QTY).toFixed(3):''],['Grade',rec.GRADE],['Lorry No',rec.LORRY_NO||'—']];
+    grid.innerHTML = fields.map(function(pair){
+      return '<div class="do-ref-item"><div class="do-ref-item-label">'+pair[0]+'</div><div class="do-ref-item-val">'+(pair[1]||'—')+'</div></div>';
+    }).join('');
+    window._selectedRec = rec;
+    prefillFromRecord(rec, activeUser);
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// FORM HTML BUILDERS
+// ════════════════════════════════════════════════════════════
+function fg(label, inputHtml) { return '<div class="form-group"><label>'+label+'</label>'+inputHtml+'</div>'; }
+function fi(id, placeholder, extra) { return '<input id="'+id+'" placeholder="'+placeholder+'" '+(extra||'')+'>'; }
+function fn(id, placeholder, extra) { return '<input type="number" id="'+id+'" placeholder="'+placeholder+'" '+(extra||'')+'>'; }
+function fd(id) { return '<input type="date" id="'+id+'">'; }
+function ft(id) { return '<input type="time" id="'+id+'">'; }
+function fc(id, placeholder) { return '<input id="'+id+'" placeholder="'+placeholder+'" class="calc-field" readonly>'; }
+function fr(id, placeholder) { return '<input id="'+id+'" placeholder="'+placeholder+'" class="readonly-field" readonly>'; }
+function fs(id, onchange) { return '<select id="'+id+'"'+(onchange?' onchange="'+onchange+'"':'')+' ></select>'; }
+function fb(label) { return '<div class="form-block-title">'+label+'</div>'; }
+function grid(fields) { return '<div class="form-grid">'+fields.join('')+'</div>'; }
+function block(title, content, actns) { return '<div class="form-block">'+fb(title)+content+(actns||'')+'</div>'; }
+function actions(btns) { return '<div class="form-actions">'+btns+'</div>'; }
+function btn(cls, onclick, label) { return '<button class="btn '+cls+'" onclick="'+onclick+'">'+label+'</button>'; }
+
+function renderUser1Form() {
+  return block('📋 User 1 — Order Information',
+    grid([
+      fg('Consignor Name *', fs('f1-consignor','')),
+      fg('Consignee Name *', fs('f1-consignee','')),
+      fg('SO No.', fi('f1-so-no','Sales Order No.')),
+      fg('SO Date', fd('f1-so-date')),
+      fg('SO Recv Time', ft('f1-so-recv')),
+      fg('Sold To Party (Manual)', fi('f1-sold-to','Enter Sold To Party')),
+      fg('Ship To Party (Manual)', fi('f1-ship-to','Enter Ship To Party')),
+      fg('DO No. *', fi('f1-do-no','Delivery Order No.')),
+      fg('Indent No.', fi('f1-indent-no','Indent No.')),
+      fg('Destination *', fs('f1-destination','onDestChange()')),
+      fg('Unloading / UN Point (Auto)', fi('f1-unloading','Auto-fills from destination')),
+      fg('Bags *', fn('f1-bags','No. of bags','oninput="calcAQty()"')),
+      fg('A-Qty MT (Auto = Bags ÷ 40)', fc('f1-a-qty','0.000')),
+      fg('Grade', fs('f1-grade','')),
+      fg('DCA', fs('f1-dca',''))
+    ]),
+    actions(btn('btn-amber','saveUser1()','Save Order →')+' '+btn('btn-secondary','clearForm(1)','Clear'))
+  );
+}
+
+function renderUser2Form() {
+  var isAdmin = userRole === 'admin' || userRole === 'superadmin';
+  var updateBlock = isAdmin
+    ? '<div class="form-block update-block">'
+        +fb('✏️ Update Existing Record (by DO No.)')
+        +'<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Type any DO No. to update Lorry No, GP No, GP Date and Lorry Starters.</div>'
+        +grid([fg('DO No. to Update',fi('f2-upd-do','Enter DO No.')),fg('Lorry No.',fi('f2-upd-lorry','e.g. KA01AB1234')),fg('GP No.',fi('f2-upd-gp-no','Gate Pass No.')),fg('GP Date','<input type="datetime-local" id="f2-upd-gp-date">'),fg('Lorry Starters',fi('f2-upd-starters','Starter details'))])
+        +actions(btn('btn-secondary','saveUser2Update()','Update Record'))
+        +'</div>'
+    : '';
+  return updateBlock + block('🚛 User 2 — Lorry & Gate Pass',
+    grid([
+      fg('Lorry No. *','<input id="f2-lorry-no" placeholder="e.g. KA01AB1234" style="text-transform:uppercase" oninput="onLorryNoInput()">'),
+      fg('Driver No.', fi('f2-driver-no','Driver mobile no.')),
+      fg('Lorry Placement Date & Time (Auto)', fc('f2-placement','Auto-fills when Lorry No. entered')),
+      fg('Lorry Starters', fi('f2-starters','Starter details')),
+      fg('GP No.', fi('f2-gp-no','Gate Pass No.')),
+      fg('GP Time (Auto = Today)', fc('f2-gp-time',''))
+    ]),
+    actions(btn('btn-amber','saveUserN(2)','Save Lorry Details →'))
+  );
+}
+
+function renderUser3Form() {
+  return block('💰 User 3 — Freight & Payment',
+    grid([
+      fg('C-Qty MT (Auto from Bags)', fc('f3-c-qty','0.000')),
+      fg('PMT Rate (₹/MT)', fn('f3-pmt-rate','Rate','oninput="calcFreight()"')),
+      fg('Unloading & Others (₹)', fn('f3-unl-others','0','oninput="calcFreight()"')),
+      fg('Total PMT (Auto)', fc('f3-total-pmt','0')),
+      fg('Total Freight = PMT × C-Qty (Auto)', fc('f3-total-frt','0')),
+      fg('LM (₹)', fn('f3-lm','0','oninput="calcFreight()"')),
+      fg('PM (₹)', fn('f3-pm','0','oninput="calcFreight()"')),
+      fg('UN Exp (₹)', fn('f3-un-exp','0','oninput="calcFreight()"')),
+      fg('MF Freight (Auto)', fc('f3-mf-frt','0')),
+      fg('MRPL Diesel (₹)', fn('f3-mrpl','0','oninput="calcFreight()"')),
+      fg('BAL (₹)', fn('f3-bal','0','oninput="calcFreight()"')),
+      fg('Advance (Auto)', fc('f3-advance','0')),
+      fg('Total NEFT (Auto)', fc('f3-total-neft','0'))
+    ])
+  )
+  +block('🏦 Advance Account Details',
+    grid([
+      fg('Adv A/C Holder *', fs('f3-adv-holder','onAdvHolderChange()')),
+      fg('Adv Acc No. (Auto)', fc('f3-adv-acc','')),
+      fg('Adv IFSC (Auto)', fc('f3-adv-ifsc','')),
+      fg('Bal A/C Holder', fi('f3-bal-holder','Holder name')),
+      fg('Bal Acc No.', fi('f3-bal-acc','Account no.')),
+      fg('Bal IFSC', fi('f3-bal-ifsc','IFSC code'))
+    ]),
+    actions(btn('btn-amber','saveUserN(3)','Save Freight →'))
+  );
+}
+
+function renderUser4Form() {
+  var soRows = '';
+  for (var i = 1; i <= 5; i++) {
+    soRows += '<tr style="border-bottom:1px solid var(--border);">'
+      +'<td style="padding:8px 10px;color:var(--muted);font-weight:700;font-size:11px;">'+i+'</td>'
+      +'<td style="padding:6px 8px;"><input id="f4-so-'+i+'" placeholder="SO No. '+i+'" oninput="calcSOSplit()" style="width:100%;"></td>'
+      +'<td style="padding:6px 8px;"><input id="f4-lr-'+i+'" placeholder="LR No. '+i+'" style="width:100%;"></td>'
+      +'<td style="padding:6px 8px;"><input id="f4-amt-'+i+'" class="calc-field" readonly style="width:100%;"></td>'
+      +'</tr>';
+  }
+  return block('📄 User 4 — Invoice & Documents',
+    grid([
+      fg('Lorry No (from User 2)', fr('f4-lorry-ro','')),
+      fg('Driver No (from User 2)', fr('f4-driver-ro','')),
+      fg('UN Point', fr('f4-unpoint-ro','')),
+      fg('E-Way Bill No.', fi('f4-eway-no','E-Way Bill No.')),
+      fg('E-Way Bill Expiry', fd('f4-eway-exp')),
+      fg('Broker Name', fs('f4-broker',"onBrokerChange('f4')")),
+      fg('Broker No. (Auto)', fc('f4-broker-no',''))
+    ])
+  )
+  +'<div class="form-block">'
+  +fb('🔢 MF No. & Invoice Details')
+  +grid([
+    fg('MF No. *', fi('f4-mf-no','MF No.','')),
+    fg('Total Invoice Value (₹) *', fn('f4-inv-val-total','Total amount','oninput="calcSOSplit()"')),
+    fg('Invoice No.', fi('f4-inv-no','Invoice No.')),
+    fg('Invoice Date', fd('f4-inv-date'))
+  ])
+  +'<div style="margin-top:20px;padding:16px;background:var(--offwhite);border:1.5px solid var(--border);border-radius:8px;">'
+  +'<div style="font-size:11px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;">❓ Multiple SO Numbers for this MF No.?</div>'
+  +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
+  +'<button id="f4-btn-no"  class="btn btn-amber"     onclick="onMultiSO(false)" style="padding:12px;font-size:13px;">✔ NO — Single SO + Single LR</button>'
+  +'<button id="f4-btn-yes" class="btn btn-secondary" onclick="onMultiSO(true)"  style="padding:12px;font-size:13px;">✔ YES — Multiple SO + Multiple LR</button>'
+  +'</div></div>'
+  +'<div id="f4-single-section" style="margin-top:16px;">'
+  +'<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Single SO Details</div>'
+  +grid([fg('SO No. (from User 1)', fc('f4-so-single','')),fg('LR No. *', fi('f4-lr-single','Enter LR No.')),fg('Adv + Bal Amount (from User 3)', fc('f4-amt-single','₹ 0'))])
+  +'</div>'
+  +'<div id="f4-multi-section" style="display:none;margin-top:16px;">'
+  +'<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">SO 1 auto-filled from User 1. Fill remaining SOs + their LR Numbers.</div>'
+  +'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">'
+  +'<thead><tr style="background:var(--navy);"><th style="padding:8px 10px;text-align:left;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;width:34px;">#</th><th style="padding:8px 10px;text-align:left;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;">SO Number</th><th style="padding:8px 10px;text-align:left;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;">LR Number</th><th style="padding:8px 10px;text-align:left;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;">Adv ₹ | Bal ₹ (per SO)</th></tr></thead>'
+  +'<tbody>'+soRows+'</tbody></table></div></div>'
+  +actions(btn('btn-amber','saveUserN(4)','Save Invoice →'))
+  +'</div>';
+}
+
+function renderUser5Form() {
+  var pending = records.filter(function(r){ return String(r.STATUS||'').trim()==='SEC4_DONE'; });
+  var rows = '';
+  if (!pending.length) {
+    rows = '<tr><td colspan="7"><div class="empty"><div class="empty-icon">✅</div><div class="empty-text">No trucks pending tracking</div></div></td></tr>';
+  } else {
+    pending.forEach(function(r){
+      rows += '<tr>'
+        +'<td><strong>'+(r.DO_NO||'—')+'</strong></td>'
+        +'<td>'+(r.CONSIGNOR_NAME||'—')+'</td><td>'+(r.CONSIGNEE_NAME||'—')+'</td>'
+        +'<td class="mono">'+(r.LORRY_NO||'—')+'</td>'
+        +'<td>'+(r.DESTINATION||'—')+'</td>'
+        +'<td><input type="date" id="u5-date-'+r.ID+'" style="padding:6px 8px;font-size:12px;border:1.5px solid var(--border);border-radius:6px;background:var(--offwhite);color:var(--text);font-family:var(--sans);font-weight:600;"></td>'
+        +'<td>'+btn('btn-success btn-sm','saveUser5Tracking("'+r.ID+'")','✓ Confirm')+'</td>'
+        +'</tr>';
+    });
+  }
+  return '<div class="tracking-note">📞 User 5 — Tracking: When truck confirms unloading, enter the date and click Confirm.</div>'
+    +'<div class="form-block">'+fb('📍 User 5 — Tracking (Enter Unloading Date per Truck)')
+    +'<div class="tbl-wrap"><table>'
+    +'<thead><tr><th>DO No</th><th>Consignor</th><th>Consignee</th><th>Lorry No</th><th>Destination</th><th>Unloading Date</th><th>Action</th></tr></thead>'
+    +'<tbody>'+rows+'</tbody></table></div>'
+    +'<div style="margin-top:12px">'+btn('btn-secondary','loadRecords().then(function(){renderUserForm(5)})','↻ Refresh List')+'</div>'
+    +'</div>';
+}
+
+function renderUser6Form() {
+  return block('🛡 User 6 — Insurance',
+    grid([
+      fg('Lorry No (Auto)', fr('f6-lorry-ro','')),
+      fg('LR No (Auto)', fr('f6-lr-ro','')),
+      fg('MF No (Auto)', fr('f6-mf-ro','')),
+      fg('Invoice No (Auto)', fr('f6-inv-no-ro','')),
+      fg('Invoice Value (Auto)', fr('f6-inv-val-ro','')),
+      fg('Invoice Date (Auto)', fr('f6-inv-date-ro','')),
+      fg('Broker Name (Auto from User 4)', fr('f6-broker-ro','')),
+      fg('Insurance Number (Dropdown or Manual)',
+        '<div style="display:flex;gap:8px">'
+        +'<select id="f6-ins-num-select" onchange="onInsNumSelect()" style="flex:1"><option value="">Select...</option>'
+        +'<option>10</option><option>20</option><option>30</option><option>40</option><option>50</option>'
+        +'<option>60</option><option>70</option><option>80</option><option>90</option><option>100</option></select>'
+        +'<input type="number" id="f6-ins-num" placeholder="Or type" style="flex:1" oninput="calcInsPremium()"></div>'
+      ),
+      fg('Insurance Premium = INV × Ins.No ÷ 100000 (Auto)', fc('f6-ins-pre','0'))
+    ]),
+    actions(btn('btn-amber','saveUserN(6)','Save Insurance →'))
+  );
+}
+
+function renderUser7Form() {
+  return block('🧾 User 7 — Billing',
+    grid([
+      fg('C-Qty MT (Auto)', fr('f7-cqty-ro','')),
+      fg('Bill No.', fi('f7-bill-no','Bill No.')),
+      fg('BR Rate (₹/MT)', fn('f7-br-rate','0','oninput="calcBrAmt()"')),
+      fg('BR PMT Amt (Auto = Rate × C-Qty)', fc('f7-br-amt','0')),
+      fg('Ref No.', fi('f7-ref-no','Ref No.')),
+      '<div class="form-group full"><label>Remarks</label><textarea id="f7-remarks" rows="3" placeholder="Any remarks..."></textarea></div>'
+    ]),
+    actions(btn('btn-success','saveUserN(7)','✓ Complete &amp; Archive'))
+  );
+}
+
+function renderUserForm(n) {
+  var pending = (n===1||n===5) ? [] : getPendingForUser(n);
+  var doSel   = (n===5) ? '' : renderDOSelector(n, pending);
+  var formHtml = '';
+  if      (n===1) formHtml = renderUser1Form();
+  else if (n===2) formHtml = renderUser2Form();
+  else if (n===3) formHtml = renderUser3Form();
+  else if (n===4) formHtml = renderUser4Form();
+  else if (n===5) formHtml = renderUser5Form();
+  else if (n===6) formHtml = renderUser6Form();
+  else if (n===7) formHtml = renderUser7Form();
+  document.getElementById('user-section-content').innerHTML = doSel + formHtml;
+  populateFormDropdowns(n);
+  if (n===2) { var el=document.getElementById('f2-gp-time'); if(el) el.value=new Date().toLocaleString('en-IN'); }
+  if (window._selectedRec && n !== 1 && n !== 5) prefillFromRecord(window._selectedRec, n);
+}
+
+// ════════════════════════════════════════════════════════════
+// POPULATE DROPDOWNS
+// ════════════════════════════════════════════════════════════
+function populateFormDropdowns(n) {
+  function fill(id, arr, vk, lk) {
+    var el = document.getElementById(id); if (!el) return;
+    el.innerHTML = '<option value="">Select...</option>';
+    (arr||[]).forEach(function(item){
+      var o = document.createElement('option');
+      o.value = item[vk]||''; o.textContent = item[lk]||''; el.appendChild(o);
+    });
+  }
+  if (n===1) {
+    fill('f1-consignor',   master.parties,      'PARTY_NAME','PARTY_NAME');
+    fill('f1-consignee',   master.parties,      'PARTY_NAME','PARTY_NAME');
+    fill('f1-destination', master.destinations, 'DESTINATION','DESTINATION');
+    fill('f1-grade',       master.grades,       'GRADE_CODE','GRADE_CODE');
+    fill('f1-dca',         master.dcaList,      'NAME','NAME');
+  }
+  if (n===3) fill('f3-adv-holder', master.accounts, 'HOLDER_NAME','HOLDER_NAME');
+  if (n===4) fill('f4-broker',     master.brokers,  'BROKER_NAME','BROKER_NAME');
+}
+
+// ════════════════════════════════════════════════════════════
+// AUTO-FILL HANDLERS
+// ════════════════════════════════════════════════════════════
+function onDestChange() {
+  var v = (document.getElementById('f1-destination')||{}).value;
+  var dest = (master.destinations||[]).find(function(d){ return d.DESTINATION===v; });
+  if (dest) { var el=document.getElementById('f1-unloading'); if(el) el.value=dest.UNLOADING_TYPE||''; }
+}
+function onAdvHolderChange() {
+  var v = (document.getElementById('f3-adv-holder')||{}).value;
+  var acc = (master.accounts||[]).find(function(a){ return a.HOLDER_NAME===v; });
+  var s = function(id,val){ var el=document.getElementById(id); if(el) el.value=val||''; };
+  s('f3-adv-acc', acc?acc.ACCOUNT_NO:''); s('f3-adv-ifsc', acc?acc.IFSC_CODE:'');
+}
+function onBrokerChange(prefix) {
+  var sel = document.getElementById(prefix+'-broker'); if(!sel) return;
+  var b = (master.brokers||[]).find(function(x){ return x.BROKER_NAME===sel.value; });
+  var el = document.getElementById(prefix+'-broker-no'); if(el) el.value = b?b.BROKER_NO:'';
+}
+function prefillFromRecord(rec, userNum) {
+  var s = function(id,v){ var el=document.getElementById(id); if(el) el.value=v||''; };
+  if (userNum===3) { s('f3-c-qty',rec.C_QTY||rec.A_QTY||''); calcFreight(); }
+  if (userNum===4) {
+    s('f4-lorry-ro',rec.LORRY_NO); s('f4-driver-ro',rec.DRIVER_NO); s('f4-unpoint-ro',rec.UNLOADING);
+    s('f4-so-single',rec.SO_NO||'');
+    var amSingle = document.getElementById('f4-amt-single');
+    var adv4 = parseFloat(rec.ADVANCE)||0; var bal4 = parseFloat(rec.BAL)||0;
+    if (amSingle) amSingle.value = (adv4+bal4).toFixed(2);
+  }
+  if (userNum===6) {
+    s('f6-lorry-ro',rec.LORRY_NO_U6||rec.LORRY_NO||'');
+    s('f6-lr-ro',rec.LR_NO_U6||rec.LR_NO||rec.LR_NO_U4||'');
+    s('f6-mf-ro',rec.MF_NO_U6||rec.MF_NO||'');
+    s('f6-inv-no-ro',rec.INV_NO_U6||rec.INV_NO||'');
+    s('f6-inv-val-ro',rec.INV_VALUE_U6||rec.INV_VALUE||'');
+    s('f6-inv-date-ro',rec.INV_DATE_U6||rec.INV_DATE||'');
+    s('f6-broker-ro',rec.BROKER_NAME_U4||rec.BROKER_NAME_U5||'');
+    calcInsPremium();
+  }
+  if (userNum===7) { s('f7-cqty-ro',rec.C_QTY||rec.A_QTY||''); }
+}
+
+// ════════════════════════════════════════════════════════════
+// CALCULATIONS
+// ════════════════════════════════════════════════════════════
+function gv(id){ return parseFloat((document.getElementById(id)||{}).value)||0; }
+function sv(id,v){ var el=document.getElementById(id); if(!el)return; el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT'?el.value=v:el.textContent=v; }
+
+function calcAQty(){ sv('f1-a-qty',(gv('f1-bags')/40).toFixed(3)); }
+function calcFreight(){
+  var cQty=gv('f3-c-qty'),pmt=gv('f3-pmt-rate'),unl=gv('f3-unl-others');
+  var lm=gv('f3-lm'),pm=gv('f3-pm'),unExp=gv('f3-un-exp'),mrpl=gv('f3-mrpl'),bal=gv('f3-bal');
+  var tPmt=pmt+unl,tFrt=tPmt*cQty,mfFrt=tFrt-lm-pm-unExp,adv=mfFrt-mrpl-bal;
+  sv('f3-total-pmt',tPmt.toFixed(2));sv('f3-total-frt',tFrt.toFixed(2));
+  sv('f3-mf-frt',mfFrt.toFixed(2));sv('f3-advance',adv.toFixed(2));sv('f3-total-neft',adv.toFixed(2));
+}
+function onMultiSO(isMulti){
+  var singleSec=document.getElementById('f4-single-section');
+  var multiSec=document.getElementById('f4-multi-section');
+  var btnNo=document.getElementById('f4-btn-no'),btnYes=document.getElementById('f4-btn-yes');
+  if(!singleSec||!multiSec) return;
+  if(isMulti){
+    singleSec.style.display='none';multiSec.style.display='block';
+    if(btnNo){btnNo.className='btn btn-secondary';btnNo.style.padding='12px';btnNo.style.fontSize='13px';}
+    if(btnYes){btnYes.className='btn btn-amber';btnYes.style.padding='12px';btnYes.style.fontSize='13px';}
+    var rec=window._selectedRec; if(rec){var so1=document.getElementById('f4-so-1');if(so1&&!so1.value)so1.value=rec.SO_NO||'';}
+    calcSOSplit();
+  } else {
+    singleSec.style.display='block';multiSec.style.display='none';
+    if(btnNo){btnNo.className='btn btn-amber';btnNo.style.padding='12px';btnNo.style.fontSize='13px';}
+    if(btnYes){btnYes.className='btn btn-secondary';btnYes.style.padding='12px';btnYes.style.fontSize='13px';}
+    var rec2=window._selectedRec; if(rec2){var ss=document.getElementById('f4-so-single');if(ss)ss.value=rec2.SO_NO||'';}
+    calcSOSplit();
+  }
+}
+function calcSOSplit(){
+  var rec=window._selectedRec;
+  var advance=rec?(parseFloat(rec.ADVANCE)||0):0,bal=rec?(parseFloat(rec.BAL)||0):0,total=advance+bal;
+  var amSingle=document.getElementById('f4-amt-single');
+  if(amSingle) amSingle.value=total>0?total.toFixed(2):(gv('f4-inv-val-total').toFixed(2));
+  var filled=0;
+  for(var i=1;i<=5;i++){var el=document.getElementById('f4-so-'+i);if(el&&el.value.trim())filled++;}
+  var advEach=filled>0?(advance/filled).toFixed(2):'',balEach=filled>0?(bal/filled).toFixed(2):'';
+  for(var j=1;j<=5;j++){
+    var soEl=document.getElementById('f4-so-'+j),amEl=document.getElementById('f4-amt-'+j);
+    if(amEl){if(soEl&&soEl.value.trim()&&filled>0)amEl.value='Adv:'+advEach+' Bal:'+balEach;else amEl.value='';}
+  }
+}
+function calcBrAmt(){ sv('f7-br-amt',(gv('f7-br-rate')*gv('f7-cqty-ro')).toFixed(2)); }
+function onInsNumSelect(){var sel=document.getElementById('f6-ins-num-select'),inp=document.getElementById('f6-ins-num');if(sel&&sel.value&&inp){inp.value=sel.value;calcInsPremium();}}
+function calcInsPremium(){ sv('f6-ins-pre',(gv('f6-inv-val-ro')*gv('f6-ins-num')/100000).toFixed(2)); }
+function onLorryNoInput(){
+  var lorryEl=document.getElementById('f2-lorry-no'),placEl=document.getElementById('f2-placement');
+  if(!lorryEl||!placEl) return;
+  if(lorryEl.value.trim().length>0){
+    var now=new Date(),pad=function(n){return n<10?'0'+n:n;};
+    placEl.value=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())+'T'+pad(now.getHours())+':'+pad(now.getMinutes());
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// SAVE FUNCTIONS (Supabase)
+// ════════════════════════════════════════════════════════════
+function v(id)  { return (document.getElementById(id)||{}).value||''; }
+function nv(id) { return parseFloat((document.getElementById(id)||{}).value)||0; }
+
+async function saveUser1() {
+  if(!v('f1-consignor')||!v('f1-consignee')||!v('f1-do-no')||!v('f1-destination')||!v('f1-bags'))
+    {toast('Fill Consignor, Consignee, DO No, Destination and Bags','error');return;}
+  var bags=nv('f1-bags'),qty=+(bags/40).toFixed(3);
+  var data={
+    status:'NEW',
+    consignor_name:v('f1-consignor'),consignee_name:v('f1-consignee'),
+    so_no:v('f1-so-no'),so_date:v('f1-so-date')||null,
+    so_recv_time:v('f1-so-recv'),
+    sold_to_party:v('f1-sold-to'),ship_to_party:v('f1-ship-to'),
+    do_no:v('f1-do-no'),indent_no:v('f1-indent-no'),
+    destination:v('f1-destination'),unloading:v('f1-unloading'),
+    bags:bags,a_qty:qty,c_qty:qty,grade:v('f1-grade'),dca:v('f1-dca'),
+    sec1_by:currentUser.id,created_at:new Date().toISOString(),updated_at:new Date().toISOString()
+  };
+  setTopbar('Saving...');
+  try {
+    var r = await sb.from('transport_data').insert(data);
+    if (r.error) throw new Error(r.error.message);
+    await logActivity('INSERT','transport_data',null,data);
+    toast('DO No. '+data.do_no+' created!','success');
+    clearForm(1);
+    await loadRecords();
+  } catch(e) { toast('Error: '+e.message,'error'); }
+  setTopbar('');
+}
+
+async function saveUser2Update() {
+  var doNo=v('f2-upd-do'),lorry=v('f2-upd-lorry'),gpNo=v('f2-upd-gp-no'),gpDt=v('f2-upd-gp-date'),starters=v('f2-upd-starters');
+  if(!doNo.trim()){toast('Enter a DO No. to update','error');return;}
+  setTopbar('Saving...');
+  try {
+    var upd={updated_at:new Date().toISOString()};
+    if(lorry) upd.lorry_no=lorry.toUpperCase();
+    if(gpNo)  upd.gp_no=gpNo;
+    if(gpDt)  upd.gp_time=gpDt;
+    if(starters) upd.lorry_starters=starters;
+    var r = await sb.from('transport_data').update(upd).eq('do_no',doNo);
+    if(r.error) throw new Error(r.error.message);
+    toast('Updated DO: '+doNo,'success');
+    ['f2-upd-do','f2-upd-lorry','f2-upd-gp-no','f2-upd-gp-date','f2-upd-starters'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+    await loadRecords();
+  } catch(e){ toast('Error: '+e.message,'error'); }
+  setTopbar('');
+}
+
+async function saveUserN(n) {
+  if(n!==5 && !currentRecordId){toast('Please select a DO Number first','error');return;}
+  var data={updated_at:new Date().toISOString()};
+  var nextStatus={2:'SEC2_DONE',3:'SEC3_DONE',4:'SEC4_DONE',6:'SEC6_DONE',7:'COMPLETE'};
+  if(n===2){
+    if(!v('f2-lorry-no')){toast('Lorry No. is required','error');return;}
+    Object.assign(data,{lorry_no:v('f2-lorry-no').toUpperCase(),driver_no:v('f2-driver-no'),
+      lorry_placement:v('f2-placement'),lorry_starters:v('f2-starters'),
+      gp_no:v('f2-gp-no'),gp_time:new Date().toISOString(),
+      lorry_no_mirror:v('f2-lorry-no').toUpperCase(),
+      status:'SEC2_DONE',sec2_by:currentUser.id});
+  }
+  if(n===3){
+    Object.assign(data,{pmt_rate:nv('f3-pmt-rate'),unloading_others:nv('f3-unl-others'),
+      total_pmt:nv('f3-total-pmt'),total_freight:nv('f3-total-frt'),
+      lm:nv('f3-lm'),pm:nv('f3-pm'),un_exp:nv('f3-un-exp'),
+      mf_freight:nv('f3-mf-frt'),mrpl_diesel:nv('f3-mrpl'),
+      bal:nv('f3-bal'),advance:nv('f3-advance'),total_neft:nv('f3-total-neft'),
+      adv_ac_holder:v('f3-adv-holder'),adv_acc_no:v('f3-adv-acc'),adv_ifsc:v('f3-adv-ifsc'),
+      bal_ac_holder:v('f3-bal-holder'),bal_acc_no:v('f3-bal-acc'),bal_ifsc:v('f3-bal-ifsc'),
+      status:'SEC3_DONE',sec3_by:currentUser.id});
+  }
+  if(n===4){
+    if(!v('f4-mf-no')){toast('MF No. is required','error');return;}
+    var ms=document.getElementById('f4-multi-section');
+    var isMulti=ms&&ms.style.display!=='none';
+    if(isMulti){
+      var rec4=window._selectedRec,adv4=rec4?(parseFloat(rec4.ADVANCE)||0):0,bal4=rec4?(parseFloat(rec4.BAL)||0):0;
+      var filled4=0;
+      for(var ii=1;ii<=5;ii++){var se=document.getElementById('f4-so-'+ii);if(se&&se.value.trim())filled4++;}
+      var advEach4=filled4>0?adv4/filled4:0,balEach4=filled4>0?bal4/filled4:0;
+      Object.assign(data,{inv_no:v('f4-inv-no'),inv_date:v('f4-inv-date')||null,inv_value:nv('f4-inv-val-total'),
+        mf_no:v('f4-mf-no'),is_multi_so:true,
+        eway_bill_no:v('f4-eway-no'),eway_bill_exp:v('f4-eway-exp')||null,
+        broker_name_u4:v('f4-broker'),broker_no_u4:v('f4-broker-no'),
+        lorry_no_u4:v('f4-lorry-ro'),driver_no_u4:v('f4-driver-ro'),un_point_u4:v('f4-unpoint-ro'),
+        eway_bill_no_u4:v('f4-eway-no'),eway_bill_exp_u4:v('f4-eway-exp')||null,
+        so_1:v('f4-so-1'),lr_1:v('f4-lr-1'),so_amt_1:advEach4+balEach4,so_adv_1:advEach4,so_bal_1:balEach4,
+        so_2:v('f4-so-2'),lr_2:v('f4-lr-2'),so_amt_2:advEach4+balEach4,so_adv_2:advEach4,so_bal_2:balEach4,
+        so_3:v('f4-so-3'),lr_3:v('f4-lr-3'),so_amt_3:advEach4+balEach4,so_adv_3:advEach4,so_bal_3:balEach4,
+        so_4:v('f4-so-4'),lr_4:v('f4-lr-4'),so_amt_4:advEach4+balEach4,so_adv_4:advEach4,so_bal_4:balEach4,
+        so_5:v('f4-so-5'),lr_5:v('f4-lr-5'),so_amt_5:advEach4+balEach4,so_adv_5:advEach4,so_bal_5:balEach4,
+        status:'SEC4_DONE',sec4_by:currentUser.id});
+    } else {
+      Object.assign(data,{inv_no:v('f4-inv-no'),inv_date:v('f4-inv-date')||null,inv_value:nv('f4-inv-val-total'),
+        lr_no:v('f4-lr-single'),mf_no:v('f4-mf-no'),is_multi_so:false,lr_no_single:v('f4-lr-single'),
+        eway_bill_no:v('f4-eway-no'),eway_bill_exp:v('f4-eway-exp')||null,
+        broker_name_u4:v('f4-broker'),broker_no_u4:v('f4-broker-no'),
+        lorry_no_u4:v('f4-lorry-ro'),driver_no_u4:v('f4-driver-ro'),un_point_u4:v('f4-unpoint-ro'),
+        so_1:v('f4-so-single'),lr_1:v('f4-lr-single'),so_amt_1:nv('f4-amt-single'),
+        status:'SEC4_DONE',sec4_by:currentUser.id});
+    }
+  }
+  if(n===6){
+    var rec6=window._selectedRec;
+    Object.assign(data,{
+      ins_premium:nv('f6-ins-pre'),ins_num:nv('f6-ins-num'),
+      broker_name_u6:v('f6-broker-ro'),
+      lorry_no_u6:v('f6-lorry-ro'),lr_no_u6:v('f6-lr-ro'),mf_no_u6:v('f6-mf-ro'),
+      inv_no_u6:v('f6-inv-no-ro'),inv_value_u6:nv('f6-inv-val-ro'),
+      inv_date_u6:v('f6-inv-date-ro')||null,
+      status:'SEC6_DONE',sec6_by:currentUser.id
+    });
+    // Determine correct status for SEC5 vs SEC4 records
+    var recStatus=rec6?String(rec6.STATUS||'').trim():'';
+    if(recStatus==='SEC4_DONE') data.status='SEC5_DONE';
+    else data.status='SEC6_DONE';
+  }
+  if(n===7){
+    Object.assign(data,{bill_no:v('f7-bill-no'),br_pmt_rate:nv('f7-br-rate'),br_pmt_amt:nv('f7-br-amt'),ref_no:v('f7-ref-no'),remarks:v('f7-remarks'),status:'COMPLETE',sec7_by:currentUser.id});
+  }
+  setTopbar('Saving...');
+  try {
+    var r = await sb.from('transport_data').update(data).eq('id', currentRecordId);
+    if (r.error) throw new Error(r.error.message);
+    // Archive when complete
+    if (n===7) {
+      var rec = records.find(function(r){ return String(r.ID)===String(currentRecordId); });
+      if (rec) {
+        await sb.from('transport_archive').insert({
+          original_id:rec.ID,status:'COMPLETE',do_no:rec.DO_NO,
+          consignor_name:rec.CONSIGNOR_NAME,consignee_name:rec.CONSIGNEE_NAME,
+          destination:rec.DESTINATION,lorry_no:rec.LORRY_NO,bags:rec.BAGS,
+          a_qty:rec.A_QTY,total_freight:rec.TOTAL_FREIGHT,br_pmt_amt:data.br_pmt_amt,
+          completed_at:new Date().toISOString()
+        });
+        await sb.from('transport_data').delete().eq('id', currentRecordId);
+      }
+    }
+    await logActivity('UPDATE','transport_data',currentRecordId,data);
+    var msg = n===7?'Record completed & archived!':'Section '+n+' saved!';
+    toast(msg,'success');
+    currentRecordId=null; window._selectedRec=null;
+    await loadRecords();
+    showUserSection(n);
+  } catch(e){ toast('Error: '+e.message,'error'); }
+  setTopbar('');
+}
+
+async function saveUser5Tracking(recordId) {
+  var dateEl=document.getElementById('u5-date-'+recordId);
+  var dt=dateEl?dateEl.value:'';
+  if(!dt){toast('Enter unloading date first','error');return;}
+  setTopbar('Saving...');
+  try {
+    var r = await sb.from('transport_data').update({unloading_date:dt,status:'SEC5_DONE',sec5_by:currentUser.id,updated_at:new Date().toISOString()}).eq('id',recordId);
+    if(r.error) throw new Error(r.error.message);
+    toast('Tracking confirmed — moved to User 6','success');
+    await loadRecords();
+    setTimeout(function(){renderUserForm(5);},400);
+  } catch(e){ toast('Error: '+e.message,'error'); }
+  setTopbar('');
+}
+
+async function delRecord(id) {
+  if(!confirm('Delete record? Cannot undo.')) return;
+  setTopbar('Deleting...');
+  try {
+    var r = await sb.from('transport_data').delete().eq('id',id);
+    if(r.error) throw new Error(r.error.message);
+    toast('Deleted','success');
+    await loadRecords();
+    renderPipelineTable(records);
+  } catch(e){ toast('Error: '+e.message,'error'); }
+  setTopbar('');
+}
+
+function clearForm(n) {
+  document.querySelectorAll('#user-section-content input:not(.calc-field),#user-section-content select,#user-section-content textarea')
+    .forEach(function(el){el.value='';});
+  document.querySelectorAll('#user-section-content .calc-field').forEach(function(el){el.value='';});
+}
+
+// ════════════════════════════════════════════════════════════
+// PIPELINE & ARCHIVE & DASHBOARD
+// ════════════════════════════════════════════════════════════
+function filterPipeline() {
+  var q=document.getElementById('pipe-search').value.toLowerCase();
+  renderPipelineTable(q?pipeRecords.filter(function(r){return Object.values(r).some(function(vv){return String(vv).toLowerCase().indexOf(q)>=0;});}):pipeRecords);
+}
+function renderPipelineTable(data) {
+  var tbody=document.getElementById('pipe-tbody'); if(!tbody) return;
+  var isAdmin=userRole==='admin'||userRole==='superadmin';
+  var waitFor=function(raw){
+    var s=String(raw||'').trim();
+    var m={SEC1_DONE:'User 2',SEC2_DONE:'User 3',SEC3_DONE:'User 4',SEC4_DONE:'User 5',SEC5_DONE:'User 6',SEC6_DONE:'User 7',COMPLETE:'Done'};
+    return m[s]||(s?s:'User 1');
+  };
+  if(!data||!data.length){tbody.innerHTML='<tr><td colspan="9"><div class="empty"><div class="empty-icon">📋</div><div class="empty-text">No active records</div></div></td></tr>';return;}
+  var html='';
+  data.forEach(function(r){
+    var delTd=isAdmin?('<td>'+btn('btn-danger btn-sm','delRecord("'+r.ID+'")','Del')+'</td>'):'<td></td>';
+    html+='<tr>'
+      +'<td><span class="id-chip">'+r.ID.toString().slice(-8)+'</span></td>'
+      +'<td><strong>'+(r.DO_NO||'—')+'</strong></td>'
+      +'<td>'+(r.CONSIGNOR_NAME||'—')+'</td>'
+      +'<td>'+(r.CONSIGNEE_NAME||'—')+'</td>'
+      +'<td>'+(r.DESTINATION||'—')+'</td>'
+      +'<td class="mono">'+(r.BAGS||'—')+'</td>'
+      +'<td class="mono">'+(r.LORRY_NO||'—')+'</td>'
+      +'<td>'+statusBadge(r.STATUS)+' <span style="font-size:10px;color:var(--muted);margin-left:4px">→ '+waitFor(r.STATUS)+'</span></td>'
+      +delTd+'</tr>';
+  });
+  tbody.innerHTML=html;
+}
+function renderArchiveFromData() {
+  var tbody=document.getElementById('archive-tbody'); if(!tbody) return;
+  if(!archive.length){tbody.innerHTML='<tr><td colspan="10"><div class="empty"><div class="empty-icon">✓</div><div class="empty-text">No completed records yet</div></div></td></tr>';return;}
+  var html='';
+  archive.forEach(function(r){
+    html+='<tr>'
+      +'<td><span class="id-chip">'+(r.ORIGINAL_ID||r.ID||'').toString().slice(-8)+'</span></td>'
+      +'<td><strong>'+(r.DO_NO||'—')+'</strong></td>'
+      +'<td>'+(r.CONSIGNOR_NAME||'—')+'</td>'
+      +'<td>'+(r.CONSIGNEE_NAME||'—')+'</td>'
+      +'<td>'+(r.DESTINATION||'—')+'</td>'
+      +'<td class="mono">'+(r.LORRY_NO||'—')+'</td>'
+      +'<td class="mono">'+(r.BAGS||'—')+'</td>'
+      +'<td class="mono num-positive">₹'+(r.TOTAL_FREIGHT?Number(r.TOTAL_FREIGHT).toLocaleString('en-IN'):'—')+'</td>'
+      +'<td class="mono num-positive">₹'+(r.BR_PMT_AMT?Number(r.BR_PMT_AMT).toLocaleString('en-IN'):'—')+'</td>'
+      +'<td style="font-size:11px;color:var(--muted)">'+(r.COMPLETED_AT?new Date(r.COMPLETED_AT).toLocaleDateString('en-IN'):'—')+'</td>'
+      +'</tr>';
+  });
+  tbody.innerHTML=html;
+}
+function renderDashboard() {
+  sv('s-total',records.length);
+  var today=new Date().toDateString();
+  sv('s-today',records.filter(function(r){return r.CREATED_AT&&new Date(r.CREATED_AT).toDateString()===today;}).length);
+  sv('s-done',archive.length);
+  var cnt=function(s){return records.filter(function(r){return String(r.STATUS||'').trim()===s;}).length;};
+  var psCounts=[cnt('NEW')||records.filter(function(r){return !r.STATUS||r.STATUS==='NEW';}).length,cnt('SEC1_DONE'),cnt('SEC2_DONE'),cnt('SEC3_DONE'),cnt('SEC4_DONE')+cnt('SEC5_DONE'),cnt('SEC6_DONE')-(cnt('SEC6_DONE')>0?0:0),cnt('SEC6_DONE'),archive.length];
+  // Recompute correctly
+  var ps=[
+    records.filter(function(r){return !r.STATUS||r.STATUS==='NEW';}).length,
+    cnt('SEC1_DONE'),cnt('SEC2_DONE'),cnt('SEC3_DONE'),
+    cnt('SEC4_DONE')+cnt('SEC5_DONE'),cnt('SEC6_DONE'),archive.length
+  ];
+  ['ps1','ps2','ps3','ps4','ps5','ps6','ps7'].forEach(function(id,i){
+    var el=document.getElementById(id); if(el) el.textContent=ps[i];
+    var wrap=document.getElementById('ps-'+(i+1));
+    if(wrap){wrap.classList.remove('has-items','completed');if(i===6)wrap.classList.add('completed');else if(ps[i]>0)wrap.classList.add('has-items');}
+  });
+  var tbody=document.getElementById('dash-tbody'); if(!tbody) return;
+  var recent=records.slice(0,8);
+  if(!recent.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty"><div class="empty-icon">📋</div><div class="empty-text">No records yet</div></div></td></tr>';return;}
+  var html='';
+  recent.forEach(function(r){
+    html+='<tr>'
+      +'<td><span class="id-chip">'+(r.ID||'').toString().slice(-8)+'</span></td>'
+      +'<td><strong>'+(r.DO_NO||'—')+'</strong></td>'
+      +'<td>'+(r.CONSIGNOR_NAME||'—')+'</td>'
+      +'<td>'+(r.CONSIGNEE_NAME||'—')+'</td>'
+      +'<td>'+(r.DESTINATION||'—')+'</td>'
+      +'<td class="mono">'+(r.LORRY_NO||'—')+'</td>'
+      +'<td>'+statusBadge(r.STATUS)+'</td>'
+      +'</tr>';
+  });
+  tbody.innerHTML=html;
+  pipeRecords=records;
+  renderPipelineTable(records);
+  renderArchiveFromData();
+}
+function statusBadge(raw) {
+  var s=String(raw||'').trim();
+  if(!s||s==='NEW')      return '<span class="badge badge-amber">Waiting U1</span>';
+  if(s==='SEC1_DONE')    return '<span class="badge badge-amber">Waiting U2</span>';
+  if(s==='SEC2_DONE')    return '<span class="badge badge-blue">Waiting U3</span>';
+  if(s==='SEC3_DONE')    return '<span class="badge badge-blue">Waiting U4</span>';
+  if(s==='SEC4_DONE')    return '<span class="badge badge-blue">Waiting U5</span>';
+  if(s==='SEC5_DONE')    return '<span class="badge badge-blue">Waiting U6</span>';
+  if(s==='SEC6_DONE')    return '<span class="badge badge-amber">Waiting U7</span>';
+  if(s==='COMPLETE')     return '<span class="badge badge-green">Complete</span>';
+  return '<span class="badge badge-amber">'+s+'</span>';
+}
+
+// ════════════════════════════════════════════════════════════
+// MASTER DATA (DB) PANELS — Supabase
+// ════════════════════════════════════════════════════════════
+var DB_CFG = {
+  'db-parties':    {title:'Party',       table:'parties_db',
+    fields:[{k:'party_name',K:'PARTY_NAME',l:'Party Name',t:'text',req:true},{k:'party_type',K:'PARTY_TYPE',l:'Type',t:'select',opts:['Consignor','Consignee','Both']},{k:'gstin',K:'GSTIN',l:'GSTIN',t:'text'},{k:'address',K:'ADDRESS',l:'Address',t:'text'},{k:'phone',K:'PHONE',l:'Phone',t:'text'},{k:'email',K:'EMAIL',l:'Email',t:'email'}],
+    cols:['PARTY_NAME','PARTY_TYPE','GSTIN','PHONE']},
+  'db-destination':{title:'Destination', table:'destination_db',
+    fields:[{k:'destination',K:'DESTINATION',l:'Destination',t:'text',req:true},{k:'unloading_type',K:'UNLOADING_TYPE',l:'Unloading / UN Point',t:'text',req:true}],
+    cols:['DESTINATION','UNLOADING_TYPE']},
+  'db-broker':     {title:'Broker',      table:'broker_db',
+    fields:[{k:'broker_name',K:'BROKER_NAME',l:'Broker Name',t:'text',req:true},{k:'broker_no',K:'BROKER_NO',l:'Broker No.',t:'text',req:true},{k:'broker_type',K:'BROKER_TYPE',l:'Type',t:'select',opts:['Transport','Insurance','Both']}],
+    cols:['BROKER_NAME','BROKER_NO','BROKER_TYPE']},
+  'db-account':    {title:'Account',     table:'account_db',
+    fields:[{k:'holder_name',K:'HOLDER_NAME',l:'Holder Name',t:'text',req:true},{k:'account_no',K:'ACCOUNT_NO',l:'Account No.',t:'text',req:true},{k:'ifsc_code',K:'IFSC_CODE',l:'IFSC Code',t:'text',req:true},{k:'contact_no',K:'CONTACT_NO',l:'Contact',t:'text'},{k:'bank_name',K:'BANK_NAME',l:'Bank Name',t:'text'}],
+    cols:['HOLDER_NAME','ACCOUNT_NO','IFSC_CODE','BANK_NAME']},
+  'db-dca':        {title:'DCA',         table:'dca_db',
+    fields:[{k:'name',K:'NAME',l:'DCA Name',t:'text',req:true}],
+    cols:['NAME']},
+  'db-grade':      {title:'Grade',       table:'grade_db',
+    fields:[{k:'grade_code',K:'GRADE_CODE',l:'Grade Code',t:'text',req:true},{k:'grade_name',K:'GRADE_NAME',l:'Grade Name',t:'text'},{k:'description',K:'DESCRIPTION',l:'Description',t:'text'}],
+    cols:['GRADE_CODE','GRADE_NAME','DESCRIPTION']}
+};
+
+async function renderDbPanel(key) {
+  var cfg=DB_CFG[key]; if(!cfg) return;
+  var el=document.getElementById('panel-'+key); if(!el) return;
+  var thHtml='';
+  cfg.cols.forEach(function(c){thHtml+='<th>'+c.replace(/_/g,' ')+'</th>';});
+  el.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
+    +'<div id="'+key+'-cnt" style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Loading...</div>'
+    +'<button class="btn btn-amber" onclick="openAddModal(\''+key+'\')">+ Add '+cfg.title+'</button></div>'
+    +'<div class="tbl-wrap"><table>'
+    +'<thead><tr>'+thHtml+'<th>Actions</th></tr></thead>'
+    +'<tbody id="'+key+'-tbody"><tr><td colspan="'+(cfg.cols.length+1)+'"><div class="empty"><div class="empty-icon">⏳</div></div></td></tr></tbody>'
+    +'</table></div>';
+  try {
+    var r = await sb.from(cfg.table).select('*').order('id');
+    var data=(r.data||[]).map(toUpper);
+    document.getElementById(key+'-cnt').textContent=data.length+' Records';
+    var tbody=document.getElementById(key+'-tbody');
+    if(!data.length){tbody.innerHTML='<tr><td colspan="'+(cfg.cols.length+1)+'"><div class="empty"><div class="empty-icon">📂</div><div class="empty-text">No records. Click + Add.</div></div></td></tr>';return;}
+    var rowsHtml='';
+    data.forEach(function(row){
+      var cells='';
+      cfg.cols.forEach(function(c){cells+='<td>'+(row[c]||'—')+'</td>';});
+      var delBtn='<button class="btn btn-danger btn-sm" onclick="dbDel(\''+key+'\',\''+row.ID+'\')">Del</button>';
+      var editBtn='<button class="btn btn-secondary btn-sm" onclick=\'openEditModal("'+key+'",'+JSON.stringify(row)+')\'>Edit</button>';
+      rowsHtml+='<tr>'+cells+'<td>'+editBtn+' '+delBtn+'</td></tr>';
+    });
+    tbody.innerHTML=rowsHtml;
+  } catch(e){ toast('Load error: '+e.message,'error'); }
+}
+
+function buildForm(cfg, row) {
+  var fieldsHtml='';
+  cfg.fields.forEach(function(f){
+    var val=row?(row[f.K]||''):'';
+    var lbl=f.l+(f.req?' *':'');
+    if(f.t==='select'){
+      var opts='<option value="">Select...</option>';
+      (f.opts||[]).forEach(function(o){opts+='<option'+(val===o?' selected':'')+'>'+o+'</option>';});
+      fieldsHtml+='<div class="form-group"><label>'+lbl+'</label><select id="mf-'+f.k+'">'+opts+'</select></div>';
+    } else {
+      fieldsHtml+='<div class="form-group"><label>'+lbl+'</label><input type="'+f.t+'" id="mf-'+f.k+'" value="'+escHtml(String(val))+'" placeholder="'+f.l+'"></div>';
+    }
+  });
+  var saveId=row?('\''+row.ID+'\''):'null';
+  return '<div class="form-grid">'+fieldsHtml+'</div>'
+    +'<div class="form-actions">'
+    +'<button class="btn btn-amber" onclick="dbSave(\''+cfg._key+'\','+saveId+')">Save</button>'
+    +'<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>'
+    +'</div>';
+}
+function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function openAddModal(key) {
+  var cfg=Object.assign({},DB_CFG[key],{_key:key});
+  document.getElementById('modal-title').textContent='Add '+cfg.title;
+  document.getElementById('modal-body').innerHTML=buildForm(cfg,null);
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function openEditModal(key,row) {
+  var cfg=Object.assign({},DB_CFG[key],{_key:key});
+  document.getElementById('modal-title').textContent='Edit '+cfg.title;
+  document.getElementById('modal-body').innerHTML=buildForm(cfg,row);
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal(){ document.getElementById('modal-overlay').classList.remove('open'); }
+
+async function dbSave(key, id) {
+  var cfg=DB_CFG[key]; var valid=true; var obj={active:true};
+  cfg.fields.forEach(function(f){
+    var el=document.getElementById('mf-'+f.k); if(!el) return;
+    obj[f.k]=el.value; if(f.req&&!el.value) valid=false;
+  });
+  if(!valid){toast('Fill all required fields','error');return;}
+  setTopbar('Saving...');
+  try {
+    var r;
+    if(id) r = await sb.from(cfg.table).update(obj).eq('id',id);
+    else   r = await sb.from(cfg.table).insert(obj);
+    if(r.error) throw new Error(r.error.message);
+    closeModal(); toast('Saved!','success');
+    renderDbPanel(key); await loadAll();
+  } catch(e){ toast('Error: '+e.message,'error'); }
+  setTopbar('');
+}
+async function dbDel(key,id) {
+  if(!confirm('Delete?')) return;
+  setTopbar('Deleting...');
+  try {
+    var r = await sb.from(DB_CFG[key].table).update({active:false}).eq('id',id);
+    if(r.error) throw new Error(r.error.message);
+    toast('Deleted','success'); renderDbPanel(key); await loadAll();
+  } catch(e){ toast('Error: '+e.message,'error'); }
+  setTopbar('');
+}
+
+// ════════════════════════════════════════════════════════════
+// MASTER REPORT — Supabase version
+// ════════════════════════════════════════════════════════════
+function showReportsPanel() {
+  var el=document.getElementById('panel-reports'); if(!el) return;
+  var coOpts='<option value="">All Companies</option>';
+  var uniqueConsignors=[...new Set(records.map(function(r){return r.CONSIGNOR_NAME;}).filter(Boolean))];
+  uniqueConsignors.forEach(function(c){coOpts+='<option value="'+c+'">'+c+'</option>';});
+  var destOpts='<option value="">All Destinations</option>';
+  (master.destinations||[]).forEach(function(d){destOpts+='<option value="'+d.DESTINATION+'">'+d.DESTINATION+'</option>';});
+  var gradeOpts='<option value="">All Grades</option>';
+  (master.grades||[]).forEach(function(g){gradeOpts+='<option value="'+g.GRADE_CODE+'">'+g.GRADE_CODE+'</option>';});
+  el.innerHTML=
+    '<div class="rpt-print-header" id="rpt-print-hdr"><div style="font-size:18px;font-weight:800;color:var(--navy)">MRPL — Transport Management System</div><div style="font-size:12px;color:var(--muted);margin-top:4px" id="rpt-print-subtitle">Master Report</div></div>'
+    +'<div class="rpt-filter-bar"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Filters</div>'
+    +'<div class="rpt-filter-grid">'
+    +'<div class="form-group"><label>Company</label><select id="rf-company">'+coOpts+'</select></div>'
+    +'<div class="form-group"><label>Date From</label><input type="date" id="rf-date-from"></div>'
+    +'<div class="form-group"><label>Date To</label><input type="date" id="rf-date-to"></div>'
+    +'<div class="form-group"><label>Lorry No.</label><input id="rf-lorry" placeholder="e.g. KA19AF6544"></div>'
+    +'<div class="form-group"><label>MF No.</label><input id="rf-mf" placeholder="MF No."></div>'
+    +'<div class="form-group"><label>Destination</label><select id="rf-dest">'+destOpts+'</select></div>'
+    +'<div class="form-group"><label>Grade</label><select id="rf-grade">'+gradeOpts+'</select></div>'
+    +'</div>'
+    +'<div class="rpt-actions">'
+    +'<button class="btn btn-amber" onclick="applyReportFilters()">Apply Filters</button>'
+    +'<button class="btn btn-secondary" onclick="resetReportFilters()">Reset</button>'
+    +'<button class="btn" style="background:#dc2626;color:#fff;" onclick="printReport()">🖨 Print / PDF</button>'
+    +'<button class="btn" style="background:#15803d;color:#fff;" onclick="exportReportExcel()">⬇ Download Excel</button>'
+    +'<span id="rpt-count-badge" style="font-size:11px;font-weight:700;color:var(--muted);margin-left:8px;"></span>'
+    +'</div></div>'
+    +'<div class="tab-bar">'
+    +'<button class="rpt-tab active" id="rtab-freight"   onclick="switchRptTab(\'freight\')">Freight</button>'
+    +'<button class="rpt-tab"        id="rtab-payment"   onclick="switchRptTab(\'payment\')">Payment</button>'
+    +'<button class="rpt-tab"        id="rtab-invoice"   onclick="switchRptTab(\'invoice\')">Invoice Register</button>'
+    +'<button class="rpt-tab"        id="rtab-insurance" onclick="switchRptTab(\'insurance\')">Insurance</button>'
+    +'<button class="rpt-tab"        id="rtab-status"    onclick="switchRptTab(\'status\')">DO Status</button>'
+    +'<button class="rpt-tab"        id="rtab-summary"   onclick="switchRptTab(\'summary\')">Summary</button>'
+    +'</div>'
+    +'<div id="rpt-summary-cards" class="rpt-summary"></div>'
+    +'<div id="rpt-table-container"></div>';
+  activeRptTab='freight';
+  applyReportFilters();
+}
+
+function applyReportFilters() {
+  var f={
+    company:(document.getElementById('rf-company')||{}).value||'',
+    dateFrom:(document.getElementById('rf-date-from')||{}).value||'',
+    dateTo:(document.getElementById('rf-date-to')||{}).value||'',
+    lorryNo:(document.getElementById('rf-lorry')||{}).value||'',
+    mfNo:(document.getElementById('rf-mf')||{}).value||'',
+    destination:(document.getElementById('rf-dest')||{}).value||'',
+    grade:(document.getElementById('rf-grade')||{}).value||''
+  };
+  reportFilters=f;
+  // Combine active records + archive for report
+  var allData = records.map(function(r){ return Object.assign({},r,{_source:'ACTIVE'}); })
+    .concat(archive.map(function(r){ return Object.assign({},r,{_source:'ARCHIVE'}); }));
+  var d=allData.filter(function(r){
+    if(f.company     && r.CONSIGNOR_NAME!==f.company) return false;
+    if(f.lorryNo     && !String(r.LORRY_NO||'').toUpperCase().includes(f.lorryNo.toUpperCase())) return false;
+    if(f.mfNo        && !String(r.MF_NO||'').includes(f.mfNo)) return false;
+    if(f.destination && r.DESTINATION!==f.destination) return false;
+    if(f.grade       && r.GRADE!==f.grade) return false;
+    if(f.dateFrom) { var sd=new Date(r.SO_DATE||r.CREATED_AT); if(isNaN(sd)||sd<new Date(f.dateFrom)) return false; }
+    if(f.dateTo)   { var ed=new Date(r.SO_DATE||r.CREATED_AT); if(isNaN(ed)||ed>new Date(f.dateTo+'T23:59:59')) return false; }
+    return true;
+  });
+  reportData=d;
+  var badge=document.getElementById('rpt-count-badge');
+  if(badge) badge.textContent=d.length+' records found';
+  renderRptSummaryCards();
+  renderRptTable();
+}
+function resetReportFilters(){
+  ['rf-company','rf-date-from','rf-date-to','rf-lorry','rf-mf','rf-dest','rf-grade'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  applyReportFilters();
+}
+function switchRptTab(tab){
+  activeRptTab=tab;
+  document.querySelectorAll('.rpt-tab').forEach(function(t){t.classList.remove('active');});
+  var tb=document.getElementById('rtab-'+tab); if(tb) tb.classList.add('active');
+  renderRptSummaryCards(); renderRptTable();
+}
+function rn(v){return parseFloat(v)||0;}
+function rinr(v){return 'Rs.'+rn(v).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:0});}
+function renderRptSummaryCards(){
+  var el=document.getElementById('rpt-summary-cards'); if(!el) return;
+  var d=reportData;
+  var totalFrt=d.reduce(function(s,r){return s+rn(r.TOTAL_FREIGHT);},0);
+  var totalAdv=d.reduce(function(s,r){return s+rn(r.ADVANCE);},0);
+  var totalNeft=d.reduce(function(s,r){return s+rn(r.TOTAL_NEFT);},0);
+  var totalBags=d.reduce(function(s,r){return s+rn(r.BAGS);},0);
+  var totalMT=d.reduce(function(s,r){return s+rn(r.A_QTY);},0);
+  var totalIns=d.reduce(function(s,r){return s+rn(r.INS_PREMIUM);},0);
+  var cards=[{val:d.length,lbl:'Total DOs'},{val:totalBags,lbl:'Total Bags'},{val:totalMT.toFixed(1)+' MT',lbl:'Total Qty MT'},{val:rinr(totalFrt),lbl:'Total Freight'},{val:rinr(totalAdv),lbl:'Total Advance'},{val:rinr(totalNeft),lbl:'Total NEFT'},{val:rinr(totalIns),lbl:'Total Insurance'}];
+  el.innerHTML=cards.map(function(c){return '<div class="rpt-sum-card"><div class="rpt-sum-val">'+c.val+'</div><div class="rpt-sum-lbl">'+c.lbl+'</div></div>';}).join('');
+}
+var moneyKeysRpt={TOTAL_FREIGHT:1,MF_FREIGHT:1,ADVANCE:1,TOTAL_NEFT:1,LM:1,PM:1,UN_EXP:1,MRPL_DIESEL:1,BAL:1,INV_VALUE:1,INS_PREMIUM:1,PMT_RATE:1,TOTAL_PMT:1,SO_AMT_1:1,SO_AMT_2:1,SO_AMT_3:1,SO_AMT_4:1,SO_AMT_5:1,SO_ADV_1:1,SO_ADV_2:1,SO_ADV_3:1,SO_ADV_4:1,SO_ADV_5:1,SO_BAL_1:1,SO_BAL_2:1,SO_BAL_3:1,SO_BAL_4:1,SO_BAL_5:1,UNLOADING_OTHERS:1};
+function getRptColumns(){
+  var cols={
+    freight:[{k:'DO_NO',l:'DO No'},{k:'SO_NO',l:'SO No'},{k:'SO_DATE',l:'Date'},{k:'CONSIGNOR_NAME',l:'Consignor'},{k:'CONSIGNEE_NAME',l:'Consignee'},{k:'DESTINATION',l:'Destination'},{k:'LORRY_NO',l:'Lorry No'},{k:'BAGS',l:'Bags'},{k:'A_QTY',l:'MT'},{k:'GRADE',l:'Grade'},{k:'PMT_RATE',l:'PMT Rate'},{k:'UNLOADING_OTHERS',l:'Unl.Others'},{k:'TOTAL_PMT',l:'Total PMT'},{k:'C_QTY',l:'C-Qty'},{k:'TOTAL_FREIGHT',l:'Total Frt'},{k:'LM',l:'LM'},{k:'PM',l:'PM'},{k:'UN_EXP',l:'UN Exp'},{k:'MF_FREIGHT',l:'MF Frt'},{k:'MRPL_DIESEL',l:'MRPL Diesel'},{k:'_source',l:'Source'}],
+    payment:[{k:'DO_NO',l:'DO No'},{k:'SO_DATE',l:'Date'},{k:'CONSIGNEE_NAME',l:'Consignee'},{k:'LORRY_NO',l:'Lorry No'},{k:'TOTAL_FREIGHT',l:'Total Frt'},{k:'LM',l:'LM'},{k:'PM',l:'PM'},{k:'MF_FREIGHT',l:'MF Frt'},{k:'MRPL_DIESEL',l:'MRPL Diesel'},{k:'BAL',l:'BAL'},{k:'ADVANCE',l:'Advance'},{k:'TOTAL_NEFT',l:'Total NEFT'},{k:'ADV_AC_HOLDER',l:'Adv Holder'},{k:'ADV_ACC_NO',l:'Acc No'},{k:'ADV_IFSC',l:'IFSC'},{k:'_source',l:'Source'}],
+    invoice:[{k:'DO_NO',l:'DO No'},{k:'SO_DATE',l:'Date'},{k:'CONSIGNEE_NAME',l:'Consignee'},{k:'LORRY_NO',l:'Lorry No'},{k:'MF_NO',l:'MF No'},{k:'IS_MULTI_SO',l:'Multi SO'},{k:'SO_1',l:'SO 1'},{k:'LR_1',l:'LR 1'},{k:'SO_ADV_1',l:'Adv 1'},{k:'SO_BAL_1',l:'Bal 1'},{k:'SO_2',l:'SO 2'},{k:'LR_2',l:'LR 2'},{k:'INV_NO',l:'Inv No'},{k:'INV_DATE',l:'Inv Date'},{k:'INV_VALUE',l:'Inv Value'},{k:'EWAY_BILL_NO',l:'E-Way Bill'},{k:'BROKER_NAME_U4',l:'Broker'},{k:'_source',l:'Source'}],
+    insurance:[{k:'DO_NO',l:'DO No'},{k:'SO_DATE',l:'Date'},{k:'CONSIGNEE_NAME',l:'Consignee'},{k:'LORRY_NO',l:'Lorry No'},{k:'LR_NO',l:'LR No'},{k:'MF_NO',l:'MF No'},{k:'INV_NO',l:'Inv No'},{k:'INV_VALUE',l:'Inv Value'},{k:'INV_DATE',l:'Inv Date'},{k:'INS_NUM',l:'Ins No'},{k:'INS_PREMIUM',l:'Premium'},{k:'BROKER_NAME_U6',l:'Ins Broker'},{k:'UNLOADING_DATE',l:'Unload Date'},{k:'_source',l:'Source'}],
+    status:[{k:'DO_NO',l:'DO No'},{k:'SO_DATE',l:'Date'},{k:'CONSIGNOR_NAME',l:'Consignor'},{k:'CONSIGNEE_NAME',l:'Consignee'},{k:'DESTINATION',l:'Destination'},{k:'LORRY_NO',l:'Lorry No'},{k:'BAGS',l:'Bags'},{k:'A_QTY',l:'MT'},{k:'GRADE',l:'Grade'},{k:'STATUS',l:'Status'},{k:'CREATED_AT',l:'Created'},{k:'_source',l:'Source'}],
+    summary:[{k:'DO_NO',l:'DO No'},{k:'SO_DATE',l:'Date'},{k:'CONSIGNOR_NAME',l:'Consignor'},{k:'CONSIGNEE_NAME',l:'Consignee'},{k:'DESTINATION',l:'Destination'},{k:'LORRY_NO',l:'Lorry No'},{k:'BAGS',l:'Bags'},{k:'A_QTY',l:'MT'},{k:'TOTAL_FREIGHT',l:'Total Frt'},{k:'MF_FREIGHT',l:'MF Frt'},{k:'ADVANCE',l:'Advance'},{k:'TOTAL_NEFT',l:'NEFT'},{k:'INV_VALUE',l:'Inv Value'},{k:'INS_PREMIUM',l:'Ins Pre'},{k:'STATUS',l:'Status'},{k:'_source',l:'Source'}]
+  };
+  return cols[activeRptTab]||cols.summary;
+}
+function renderRptTable(){
+  var el=document.getElementById('rpt-table-container'); if(!el) return;
+  var cols=getRptColumns(),d=reportData;
+  if(!d.length){el.innerHTML='<div class="empty" style="padding:40px"><div class="empty-icon" style="font-size:32px">📊</div><div class="empty-text">No records match your filters</div></div>';return;}
+  var thead='<thead><tr>';
+  cols.forEach(function(c){thead+='<th>'+c.l+'</th>';});
+  thead+='</tr></thead>';
+  var totals={};
+  cols.forEach(function(c){if(moneyKeysRpt[c.k])totals[c.k]=0;});
+  var tbody='<tbody>';
+  d.forEach(function(r){
+    tbody+='<tr>';
+    cols.forEach(function(c){
+      var val=r[c.k]!==undefined?r[c.k]:'';
+      if(moneyKeysRpt[c.k]){totals[c.k]=(totals[c.k]||0)+rn(val);tbody+='<td style="color:var(--green);font-family:var(--mono);text-align:right">'+(val?rinr(val):'—')+'</td>';}
+      else if(c.k==='DO_NO') tbody+='<td style="font-family:var(--mono);font-weight:700;color:var(--amber)">'+(val||'—')+'</td>';
+      else if(c.k==='STATUS') tbody+='<td>'+statusBadge(val)+'</td>';
+      else if(c.k==='_source') tbody+='<td>'+(val==='ARCHIVE'?'<span class="badge badge-green">Done</span>':'<span class="badge badge-blue">Active</span>')+'</td>';
+      else if(c.k==='LORRY_NO') tbody+='<td style="font-family:var(--mono)">'+(val||'—')+'</td>';
+      else if(c.k==='IS_MULTI_SO') tbody+='<td>'+(val?'<span class="badge badge-amber">Multi</span>':'<span class="badge">Single</span>')+'</td>';
+      else tbody+='<td>'+(val||'—')+'</td>';
+    });
+    tbody+='</tr>';
+  });
+  tbody+='</tbody>';
+  var tfoot='<tfoot><tr>';
+  cols.forEach(function(c,i){
+    if(i===0) tfoot+='<td style="color:var(--amber2)">TOTAL ('+d.length+')</td>';
+    else if(moneyKeysRpt[c.k]) tfoot+='<td style="text-align:right">'+rinr(totals[c.k]||0)+'</td>';
+    else tfoot+='<td></td>';
+  });
+  tfoot+='</tr></tfoot>';
+  el.innerHTML='<div class="rpt-table-wrap"><table class="rpt-table" id="rpt-tbl">'+thead+tbody+tfoot+'</table></div>';
+}
+function printReport(){
+  var sub=document.getElementById('rpt-print-subtitle');
+  if(sub){var f=reportFilters,parts=[];if(f.company)parts.push('Company: '+f.company);if(f.dateFrom)parts.push('From: '+f.dateFrom);if(f.dateTo)parts.push('To: '+f.dateTo);if(f.lorryNo)parts.push('Lorry: '+f.lorryNo);if(f.mfNo)parts.push('MF: '+f.mfNo);if(f.destination)parts.push('Dest: '+f.destination);if(f.grade)parts.push('Grade: '+f.grade);var tabName=activeRptTab.charAt(0).toUpperCase()+activeRptTab.slice(1);sub.textContent=tabName+' Report'+(parts.length?' | '+parts.join(' | '):' | All Records')+' | '+new Date().toLocaleDateString('en-IN');}
+  window.print();
+}
+function exportReportExcel(){
+  if(!reportData.length){toast('No data to export','error');return;}
+  var cols=getRptColumns(),bom='\uFEFF',tabName=activeRptTab.charAt(0).toUpperCase()+activeRptTab.slice(1);
+  var csv=bom+'MRPL Transport Management System,'+tabName+' Report,Generated: '+new Date().toLocaleDateString('en-IN')+'\n\n';
+  csv+=cols.map(function(c){return '"'+c.l+'"';}).join(',')+'\n';
+  reportData.forEach(function(r){csv+=cols.map(function(c){var val=r[c.k]!==undefined?r[c.k]:'';if(moneyKeysRpt[c.k]&&val!=='')return parseFloat(val)||0;return '"'+String(val||'').replace(/"/g,'""')+'"';}).join(',')+'\n';});
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='TMS_'+tabName+'_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+  toast('Excel file downloaded!','success');
+}
+
+// ════════════════════════════════════════════════════════════
+// ACCOUNT CHECK — Supabase version
+// ════════════════════════════════════════════════════════════
+function showAccountCheckPanel(){
+  var el=document.getElementById('panel-accheck'); if(!el) return;
+  el.innerHTML=
+    '<div class="ac-note">🔒 Tick <strong>Adv Paid</strong> when advance is transferred. Bal Paid unlocks after Advance is saved. When both are ticked & saved, the record is cleared from this list.</div>'
+    +'<div class="ac-email-bar">'
+    +'<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">✉ Send Payment Report by Email</div>'
+    +'<div class="ac-email-row">'
+    +'<div class="form-group"><label>Recipient Email *</label><input id="ac-email" type="email" placeholder="accounts@company.com"></div>'
+    +'<div class="form-group"><label>Subject (optional)</label><input id="ac-subject" placeholder="MRPL TMS — Payment Pending Report"></div>'
+    +'<button class="btn btn-amber" onclick="acSendEmail()" style="margin-bottom:1px">✉ Send Email</button>'
+    +'</div>'
+    +'<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;margin-top:4px;">Filters</div>'
+    +'<div class="ac-filter-grid">'
+    +'<div class="form-group"><label>Date From</label><input type="date" id="ac-date-from"></div>'
+    +'<div class="form-group"><label>Date To</label><input type="date" id="ac-date-to"></div>'
+    +'<div class="form-group"><label>Status</label><select id="ac-status"><option value="all">All Pending</option><option value="both_pending">Both Pending</option><option value="adv_pending">Adv Pending</option><option value="bal_pending">Bal Pending</option></select></div>'
+    +'<div class="form-group"><label>Broker Name</label><input id="ac-broker" placeholder="Broker..."></div>'
+    +'</div>'
+    +'<div class="ac-actions">'
+    +'<button class="btn btn-amber" onclick="acApplyFilters()">Apply Filters</button>'
+    +'<button class="btn btn-secondary" onclick="acResetFilters()">Reset</button>'
+    +'<span id="ac-count-badge" style="font-size:11px;font-weight:700;color:var(--muted);margin-left:8px;"></span>'
+    +'</div></div>'
+    +'<div id="ac-summary-cards" class="ac-summary"></div>'
+    +'<div id="ac-table-container"></div>';
+  acApplyFilters();
+}
+
+// Payment status stored in transport_data as adv_paid / bal_paid boolean columns
+async function acApplyFilters(){
+  var f={
+    dateFrom:(document.getElementById('ac-date-from')||{}).value||'',
+    dateTo:(document.getElementById('ac-date-to')||{}).value||'',
+    statusFilter:(document.getElementById('ac-status')||{}).value||'all',
+    broker:(document.getElementById('ac-broker')||{}).value||''
+  };
+  setTopbar('Loading...');
+  try {
+    // Get records that have advance or balance pending (have payment data)
+    var q = sb.from('transport_data').select('id,do_no,so_date,consignee_name,lorry_no,advance,bal,adv_ac_holder,adv_acc_no,adv_ifsc,bal_ac_holder,bal_acc_no,bal_ifsc,broker_name_u4,broker_name_u5,adv_paid,bal_paid,adv_paid_date,bal_paid_date').not('advance','is',null).gt('advance',0);
+    var r = await q;
+    var raw = (r.data||[]).map(toUpper);
+    // Apply filters
+    var d=raw.filter(function(row){
+      if(f.statusFilter==='both_pending' && (row.ADV_PAID||row.BAL_PAID)) return false;
+      if(f.statusFilter==='adv_pending'  && row.ADV_PAID)  return false;
+      if(f.statusFilter==='bal_pending'  && row.BAL_PAID)  return false;
+      if(f.broker && !String(row.BROKER_NAME_U4||row.BROKER_NAME_U5||'').toLowerCase().includes(f.broker.toLowerCase())) return false;
+      if(f.dateFrom){var dt=new Date(row.SO_DATE);if(isNaN(dt)||dt<new Date(f.dateFrom))return false;}
+      if(f.dateTo){var dt2=new Date(row.SO_DATE);if(isNaN(dt2)||dt2>new Date(f.dateTo+'T23:59:59'))return false;}
+      // Exclude fully paid
+      if(row.ADV_PAID && row.BAL_PAID) return false;
+      return true;
+    });
+    acData=d;
+    var badge=document.getElementById('ac-count-badge');
+    if(badge) badge.textContent=d.length+' record'+(d.length===1?'':'s')+' found';
+    acRenderSummary(); acRenderTable();
+  } catch(e){ toast('Load error: '+e.message,'error'); }
+  setTopbar('');
+}
+function acResetFilters(){
+  ['ac-date-from','ac-date-to','ac-broker'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  var sel=document.getElementById('ac-status');if(sel)sel.value='all';
+  acApplyFilters();
+}
+function acRenderSummary(){
+  var el=document.getElementById('ac-summary-cards');if(!el)return;
+  var both=0,advDue=0,balDue=0,totalAdv=0,totalBal=0;
+  acData.forEach(function(r){
+    if(!r.ADV_PAID&&!r.BAL_PAID)both++;
+    if(!r.ADV_PAID){advDue++;totalAdv+=Number(r.ADVANCE)||0;}
+    if(!r.BAL_PAID){balDue++;totalBal+=Number(r.BAL)||0;}
+  });
+  function rinr2(v){return 'Rs.'+Number(v).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:0});}
+  var cards=[{val:both,cls:'red',lbl:'Both Pending'},{val:balDue-both,cls:'amber',lbl:'Adv Paid, Bal Due'},{val:rinr2(totalAdv),cls:'red',lbl:'Adv Amount Due'},{val:rinr2(totalBal),cls:'amber',lbl:'Bal Amount Due'},{val:rinr2(totalAdv+totalBal),cls:'',lbl:'Total Outstanding'}];
+  el.innerHTML=cards.map(function(c){return '<div class="ac-sum-card"><div class="ac-sum-val '+(c.cls||'')+'">'+c.val+'</div><div class="ac-sum-lbl">'+c.lbl+'</div></div>';}).join('');
+}
+function acRenderTable(){
+  var el=document.getElementById('ac-table-container');if(!el)return;
+  if(!acData.length){el.innerHTML='<div class="empty" style="padding:40px;background:var(--white);border:1px solid var(--border);border-radius:var(--radius2)"><div class="empty-icon" style="font-size:32px">✓</div><div class="empty-text">No pending payments match your filters</div></div>';return;}
+  function rinr2(v){return 'Rs.'+Number(v).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:0});}
+  function fmtDate(v){if(!v)return '—';try{var d=new Date(v);return d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear();}catch(e){return v;}}
+  function daysSince(v){if(!v)return '';try{var diff=Math.floor((Date.now()-new Date(v).getTime())/86400000);return diff+' day'+(diff===1?'':'s')+' ago';}catch(e){return '';}}
+  function statusBadgeAC(r){if(!r.ADV_PAID&&!r.BAL_PAID)return '<span class="ac-badge-both">Both Pending</span>';if(r.ADV_PAID&&!r.BAL_PAID)return '<span class="ac-badge-bal">Bal Due</span>';return '<span class="ac-badge-adv">Adv Pending</span>';}
+  var totalAdv=0,totalBal=0;
+  acData.forEach(function(r){if(!r.ADV_PAID)totalAdv+=Number(r.ADVANCE)||0;if(!r.BAL_PAID)totalBal+=Number(r.BAL)||0;});
+  var thead='<thead><tr><th>DO No.</th><th>Date</th><th>Consignee</th><th>Broker</th><th>Adv A/C Details</th><th style="text-align:right">Advance</th><th>Bal A/C Details</th><th style="text-align:right">Balance</th><th>Status</th><th>Paid Tick</th><th>Action</th></tr></thead>';
+  var tbody='<tbody>';
+  acData.forEach(function(r,idx){
+    var broker=r.BROKER_NAME_U4||r.BROKER_NAME_U5||'—';
+    var advChecked=r.ADV_PAID?'checked':'',advDisabled=r.ADV_PAID?'disabled':'';
+    var balDisabled=(!r.ADV_PAID||r.BAL_PAID)?'disabled':'',balChecked=r.BAL_PAID?'checked':'';
+    tbody+='<tr>'
+      +'<td style="font-family:var(--mono);font-weight:700;color:var(--amber)">'+(r.DO_NO||'—')+'</td>'
+      +'<td style="color:var(--muted);font-size:11px">'+fmtDate(r.SO_DATE)+'</td>'
+      +'<td style="font-weight:700">'+(r.CONSIGNEE_NAME||'—')+'</td>'
+      +'<td>'+broker+'</td>'
+      +'<td><div class="ac-acc-block"><div class="ac-acc-name">'+(r.ADV_AC_HOLDER||'—')+'</div><div class="ac-acc-no">'+(r.ADV_ACC_NO||'—')+'</div><div class="ac-acc-ifsc">'+(r.ADV_IFSC||'')+'</div></div></td>'
+      +'<td style="text-align:right;font-family:var(--mono);color:var(--green);font-weight:700">'+(r.ADV_PAID?'<span style="color:var(--muted);text-decoration:line-through">'+rinr2(r.ADVANCE)+'</span>':rinr2(r.ADVANCE))+'</td>'
+      +'<td><div class="ac-acc-block"><div class="ac-acc-name">'+(r.BAL_AC_HOLDER||'—')+'</div><div class="ac-acc-no">'+(r.BAL_ACC_NO||'—')+'</div><div class="ac-acc-ifsc">'+(r.BAL_IFSC||'')+'</div></div></td>'
+      +'<td style="text-align:right;font-family:var(--mono);color:var(--green);font-weight:700">'+(r.BAL_PAID?'<span style="color:var(--muted);text-decoration:line-through">'+rinr2(r.BAL)+'</span>':rinr2(r.BAL))+'</td>'
+      +'<td>'+statusBadgeAC(r)+(r.ADV_PAID&&r.ADV_PAID_DATE?'<div class="ac-days">Adv: '+daysSince(r.ADV_PAID_DATE)+'</div>':'')+'</td>'
+      +'<td><div class="ac-cb-wrap">'
+        +'<div class="ac-cb-row"><input type="checkbox" id="ac-adv-'+idx+'" '+advChecked+' '+advDisabled+' onchange="acOnAdvChange('+idx+')"> Adv Paid</div>'
+        +'<div class="ac-cb-row"><input type="checkbox" id="ac-bal-'+idx+'" '+balChecked+' '+balDisabled+'> Bal Paid</div>'
+      +'</div></td>'
+      +'<td><button class="btn btn-secondary btn-sm" onclick="acSaveRow('+idx+')">Save</button></td>'
+      +'</tr>';
+  });
+  tbody+='</tbody>';
+  var tfoot='<tfoot><tr><td colspan="5" style="color:var(--amber2)">TOTAL PENDING ('+acData.length+' records)</td><td style="text-align:right">'+rinr2(totalAdv)+'</td><td></td><td style="text-align:right">'+rinr2(totalBal)+'</td><td colspan="3" style="text-align:right">Grand Total: '+rinr2(totalAdv+totalBal)+'</td></tr></tfoot>';
+  el.innerHTML='<div class="ac-table-wrap"><table class="ac-table">'+thead+tbody+tfoot+'</table></div>';
+}
+function acOnAdvChange(idx){
+  var advCb=document.getElementById('ac-adv-'+idx),balCb=document.getElementById('ac-bal-'+idx);
+  if(!advCb||!balCb) return;
+  var r=acData[idx]||{},advIsOn=advCb.checked||r.ADV_PAID===true;
+  balCb.disabled=!advIsOn; if(!advIsOn) balCb.checked=false;
+}
+async function acSaveRow(idx){
+  var r=acData[idx]; if(!r) return;
+  var advCb=document.getElementById('ac-adv-'+idx),balCb=document.getElementById('ac-bal-'+idx);
+  var advPaid=advCb?(advCb.checked===true):(r.ADV_PAID===true);
+  var balPaid=balCb?(balCb.checked===true):(r.BAL_PAID===true);
+  setTopbar('Saving...');
+  try {
+    var upd={adv_paid:advPaid,bal_paid:balPaid,updated_at:new Date().toISOString()};
+    if(advPaid&&!r.ADV_PAID_DATE) upd.adv_paid_date=new Date().toISOString();
+    if(balPaid&&!r.BAL_PAID_DATE) upd.bal_paid_date=new Date().toISOString();
+    var res=await sb.from('transport_data').update(upd).eq('id',r.ID);
+    if(res.error) throw new Error(res.error.message);
+    toast('Saved — DO: '+r.DO_NO,'success');
+    acApplyFilters();
+  } catch(e){ toast('Save error: '+e.message,'error'); }
+  setTopbar('');
+}
+async function acSendEmail(){
+  var email=(document.getElementById('ac-email')||{}).value||'';
+  if(!email.trim()){toast('Enter recipient email address first','error');return;}
+  if(!acData.length){toast('No records to send — apply filters first','error');return;}
+  toast('Email sending is not available in the browser version. Please download the Excel report and send manually.','error');
+}
+
+// ════════════════════════════════════════════════════════════
+// USER MANAGEMENT (Super Admin)
+// ════════════════════════════════════════════════════════════
+async function renderUserManagement(){
+  if(userRole!=='superadmin'){toast('Access denied','error');return;}
+  setTopbar('Loading users...');
+  try {
+    var r=await sb.from('users').select('*').order('created_at');
+    var users=r.data||[];
+    document.getElementById('um-count').textContent=users.length+' Users';
+    var html='';
+    users.forEach(function(u){
+      var isDisabled=!u.is_active;
+      html+='<div class="um-card'+(isDisabled?' um-disabled':'')+'"><div class="um-card-name">'+escHtml(u.full_name||'')+'</div>'
+        +'<div class="um-card-role '+u.role+'">'+u.role.toUpperCase()+(u.section?' · Section '+u.section:'')+'</div>'
+        +'<div class="um-card-info">@'+escHtml(u.username||'')+' · '+escHtml(u.email||'')+'<br>Last login: '+(u.last_login?new Date(u.last_login).toLocaleString('en-IN'):'Never')+'</div>'
+        +'<div class="um-card-actions">'
+        +(isDisabled
+          ?'<button class="btn btn-success btn-sm" onclick="umEnable(\''+u.id+'\')">Enable</button>'
+          :(u.id!==currentUser.id?'<button class="btn btn-danger btn-sm" onclick="umDisable(\''+u.id+'\')">Disable</button>':'<span style="font-size:10px;color:var(--muted);font-weight:600">You</span>'))
+        +'</div></div>';
+    });
+    document.getElementById('um-grid').innerHTML=html||'<div class="empty"><div class="empty-icon">👤</div><div class="empty-text">No users yet</div></div>';
+  } catch(e){ toast('Error: '+e.message,'error'); }
+  setTopbar('');
+}
+async function umDisable(id){
+  if(!confirm('Disable this user? They will not be able to login.')) return;
+  await sb.from('users').update({is_active:false}).eq('id',id);
+  toast('User disabled','success'); renderUserManagement();
+}
+async function umEnable(id){
+  await sb.from('users').update({is_active:true}).eq('id',id);
+  toast('User enabled','success'); renderUserManagement();
+}
+function openAddUserModal(){
+  document.getElementById('modal-title').textContent='Add New User';
+  document.getElementById('modal-body').innerHTML=
+    '<div style="background:var(--amberlt);border:1px solid #fcd34d;border-radius:var(--radius);padding:10px 14px;font-size:11px;font-weight:600;color:#92400e;margin-bottom:16px;">⚠ Step 1: Create the user in Supabase Dashboard → Authentication → Users first. Then copy their UUID and fill this form to link them to the system.</div>'
+    +'<div class="form-grid">'
+    +'<div class="form-group full"><label>Auth UUID (from Supabase Dashboard) *</label><input id="nu-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></div>'
+    +'<div class="form-group"><label>Username *</label><input id="nu-username" placeholder="e.g. section2"></div>'
+    +'<div class="form-group"><label>Full Name *</label><input id="nu-name" placeholder="Full Name"></div>'
+    +'<div class="form-group"><label>Email *</label><input type="email" id="nu-email" placeholder="user@mrpltms.local"></div>'
+    +'<div class="form-group"><label>Role *</label><select id="nu-role" onchange="umToggleSection()"><option value="user">User</option><option value="admin">Admin</option><option value="superadmin">Super Admin</option></select></div>'
+    +'<div class="form-group" id="nu-sec-group"><label>Section (for User role) *</label><select id="nu-section"><option value="">Select...</option><option value="1">Section 1 — Order</option><option value="2">Section 2 — Lorry</option><option value="3">Section 3 — Freight</option><option value="4">Section 4 — Invoice</option><option value="5">Section 5 — Tracking</option><option value="6">Section 6 — Insurance</option><option value="7">Section 7 — Billing</option></select></div>'
+    +'</div>'
+    +'<div class="form-actions">'
+    +'<button class="btn btn-amber" onclick="umCreateUser()">Create User</button>'
+    +'<button class="btn btn-secondary" onclick="closeModal()">Cancel</button>'
+    +'</div>';
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function umToggleSection(){
+  var role=document.getElementById('nu-role').value;
+  var secGrp=document.getElementById('nu-sec-group');
+  if(secGrp) secGrp.style.display=role==='user'?'':'none';
+}
+async function umCreateUser(){
+  var id=(document.getElementById('nu-id')||{}).value.trim();
+  var username=(document.getElementById('nu-username')||{}).value.trim();
+  var name=(document.getElementById('nu-name')||{}).value.trim();
+  var email=(document.getElementById('nu-email')||{}).value.trim();
+  var role=(document.getElementById('nu-role')||{}).value;
+  var section=parseInt((document.getElementById('nu-section')||{}).value)||null;
+  if(!id||!username||!name||!email){toast('Fill all required fields','error');return;}
+  if(role==='user'&&!section){toast('Select a section for user role','error');return;}
+  setTopbar('Creating...');
+  try {
+    var r=await sb.from('users').insert({id,username,full_name:name,email,role,section:section||null,is_active:true,password_hash:'managed-by-supabase-auth',created_at:new Date().toISOString()});
+    if(r.error) throw new Error(r.error.message);
+    closeModal(); toast('User '+username+' created!','success'); renderUserManagement();
+  } catch(e){ toast('Error: '+e.message,'error'); }
+  setTopbar('');
+}
+
+// ════════════════════════════════════════════════════════════
+// ACTIVITY LOG HELPER
+// ════════════════════════════════════════════════════════════
+async function logActivity(action, table, recordId, newData){
+  try {
+    await sb.from('activity_log').insert({
+      user_id:currentUser.id,username:currentUser.username,
+      action,table_name:table,record_id:recordId||null,
+      new_data:newData,created_at:new Date().toISOString()
+    });
+  } catch(e){ /* silent fail — logging should not break the app */ }
+}
+
+// ════════════════════════════════════════════════════════════
+// UI HELPERS
+// ════════════════════════════════════════════════════════════
+function setTopbar(msg){
+  var tb=document.getElementById('topbar-right');if(!tb)return;
+  tb.innerHTML=msg?'<span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);font-weight:600">'+(msg.includes('...')?'<span class="spinner" style="border-top-color:var(--amber);border-color:var(--border2);"></span>':'')+msg+'</span>':'';
+}
+var _tt;
+function toast(msg,type){
+  var el=document.getElementById('toast');
+  el.textContent=msg;el.className='show '+(type||'');
+  clearTimeout(_tt);_tt=setTimeout(function(){el.className='';},3500);
+}
+</script>
+</body>
+</html>
