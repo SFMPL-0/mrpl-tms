@@ -796,18 +796,20 @@ function getPendingForUser(n) {
   if (n === 5) return [];
   var filter;
   if (n === 6) {
-    filter = function(r){ var s=String(r.STATUS||'').trim(); return s==='SEC4_DONE'||s==='SEC5_DONE'; };
+    filter = function(r){ var s=String(r.STATUS||'').trim(); return (s==='SEC4_DONE'||s==='SEC5_DONE') && s!=='CANCELLED'; };
   } else if (n === 2) {
-    // SEC1_DONE = normal flow. Also accept NEW for backwards compatibility
-    filter = function(r){ var s=String(r.STATUS||'').trim(); return s==='SEC1_DONE'||s==='NEW'; };
+    filter = function(r){ var s=String(r.STATUS||'').trim(); return (s==='SEC1_DONE'||s==='NEW') && s!=='CANCELLED'; };
   } else {
     var needStatus = {3:'SEC2_DONE',4:'SEC3_DONE',7:'SEC6_DONE'};
     var st = needStatus[n]; if (!st) return [];
     filter = function(r){ return String(r.STATUS||'').trim()===st; };
   }
-  return records.filter(filter).map(function(r){
+  // Always exclude cancelled
+  return records.filter(function(r){
+    return filter(r) && String(r.STATUS||'').trim()!=='CANCELLED';
+  }).map(function(r){
     return {id:r.ID,do_no:r.DO_NO,consignor:r.CONSIGNOR_NAME,consignee:r.CONSIGNEE_NAME,
-            destination:r.DESTINATION,grade:r.GRADE||'',bags:r.BAGS,lorry:r.LORRY_NO||''};
+            destination:r.DESTINATION,grade:r.GRADE||'',bags:r.BAGS,a_qty:r.A_QTY||'',lorry:r.LORRY_NO||''};
   });
 }
 
@@ -827,10 +829,14 @@ function renderDOSelector(userNum, pendingDOs) {
   }
   var opts = '<option value="">— Select DO No. —</option>';
   pendingDOs.forEach(function(d){
-    opts += '<option value="'+d.id+'" data-do="'+d.do_no+'" data-consignor="'+d.consignor
-          +'" data-consignee="'+d.consignee+'" data-dest="'+d.destination
-          +'" data-grade="'+d.grade+'" data-bags="'+d.bags+'" data-lorry="'+(d.lorry||'')+'">'
-          +d.do_no+' — '+d.consignee+(d.grade?' — '+d.grade:'')+' — '+d.destination+'</option>';
+    var aqty = d.bags ? (d.bags/40).toFixed(3) : '—';
+    opts += '<option value="'+d.id+'">'
+          +d.do_no+' | '+d.consignee
+          +' | Bags:'+( d.bags||'—')
+          +' | '+aqty+' MT'
+          +(d.grade?' | '+d.grade:'')
+          +' | '+(d.destination||'—')
+          +'</option>';
   });
   return '<div class="do-selector">'
     +'<div class="do-selector-title">📋 Select DO Number — '+pendingDOs.length+' Pending</div>'
@@ -915,7 +921,18 @@ function renderUser2Form() {
         +actions(btn('btn-secondary','saveUser2Update()','Update Record'))
         +'</div>'
     : '';
-  return updateBlock + block('🚛 User 2 — Lorry & Gate Pass',
+
+  // Cancel DO block — admin only
+  var cancelBlock = isAdmin
+    ? '<div class="form-block" style="border-color:var(--red);border-width:2px;">'
+        +fb('🚫 Cancel a DO (Admin Only)')
+        +'<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Enter the DO No. to cancel. Cancelled DOs are removed from all user queues.</div>'
+        +grid([fg('DO No. to Cancel',fi('f2-cancel-do','Enter DO No. to cancel')),fg('Reason for Cancellation',fi('f2-cancel-reason','e.g. Vehicle not available'))])
+        +actions('<button class="btn btn-danger" onclick="cancelDO(\'f2-cancel-do\',\'f2-cancel-reason\')">🚫 Cancel This DO</button>')
+        +'</div>'
+    : '';
+
+  return updateBlock + cancelBlock + block('🚛 User 2 — Lorry & Gate Pass',
     grid([
       fg('Lorry No. *','<input id="f2-lorry-no" placeholder="e.g. KA01AB1234" style="text-transform:uppercase" oninput="onLorryNoInput()">'),
       fg('Driver No.', fi('f2-driver-no','Driver mobile no.')),
@@ -924,12 +941,26 @@ function renderUser2Form() {
       fg('GP No.', fi('f2-gp-no','Gate Pass No.')),
       fg('GP Time (Auto = Today)', fc('f2-gp-time',''))
     ]),
-    actions(btn('btn-amber','saveUserN(2)','Save Lorry Details →'))
+    // Confirm checkbox + Save button
+    '<div style="margin-top:16px;padding:14px;background:var(--greenbg);border:1.5px solid #86efac;border-radius:var(--radius);display:flex;align-items:center;gap:12px;">'
+    +'<input type="checkbox" id="f2-confirm-cb" style="width:18px;height:18px;accent-color:var(--green);cursor:pointer;" onchange="onUser2ConfirmChange()">'
+    +'<label for="f2-confirm-cb" style="font-size:13px;font-weight:700;color:var(--green);cursor:pointer;text-transform:none;letter-spacing:0;">✓ Lorry confirmed — vehicle has been placed and gate pass issued. Move to User 3.</label>'
+    +'</div>'
+    +actions('<button class="btn btn-amber" id="f2-save-btn" onclick="saveUserN(2)" disabled style="opacity:.4;cursor:default;">Save Lorry Details →</button>')
   );
 }
 
 function renderUser3Form() {
-  return block('💰 User 3 — Freight & Payment',
+  var isAdmin = userRole === 'admin' || userRole === 'superadmin';
+  var cancelBlock = isAdmin
+    ? '<div class="form-block" style="border-color:var(--red);border-width:2px;">'
+        +fb('🚫 Cancel a DO (Admin Only)')
+        +'<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Enter the DO No. to cancel. Cancelled DOs are removed from all queues.</div>'
+        +grid([fg('DO No. to Cancel',fi('f3-cancel-do','Enter DO No. to cancel')),fg('Reason for Cancellation',fi('f3-cancel-reason','e.g. Order cancelled by client'))])
+        +actions('<button class="btn btn-danger" onclick="cancelDO(\'f3-cancel-do\',\'f3-cancel-reason\')">🚫 Cancel This DO</button>')
+        +'</div>'
+    : '';
+  return cancelBlock + block('💰 User 3 — Freight & Payment',
     grid([
       fg('C-Qty MT (Auto from Bags)', fc('f3-c-qty','0.000')),
       fg('PMT Rate (₹/MT)', fn('f3-pmt-rate','Rate','oninput="calcFreight()"')),
@@ -1201,6 +1232,60 @@ function calcSOSplit(){
 function calcBrAmt(){ sv('f7-br-amt',(gv('f7-br-rate')*gv('f7-cqty-ro')).toFixed(2)); }
 function onInsNumSelect(){var sel=document.getElementById('f6-ins-num-select'),inp=document.getElementById('f6-ins-num');if(sel&&sel.value&&inp){inp.value=sel.value;calcInsPremium();}}
 function calcInsPremium(){ sv('f6-ins-pre',(gv('f6-inv-val-ro')*gv('f6-ins-num')/100000).toFixed(2)); }
+// ════════════════════════════════════════════════════════════
+// USER 2 CONFIRM CHECKBOX — must tick to enable Save button
+// ════════════════════════════════════════════════════════════
+function onUser2ConfirmChange() {
+  var cb  = document.getElementById('f2-confirm-cb');
+  var sbtn = document.getElementById('f2-save-btn');
+  if (!cb || !sbtn) return;
+  if (cb.checked) {
+    sbtn.disabled = false;
+    sbtn.style.opacity = '1';
+    sbtn.style.cursor  = 'pointer';
+  } else {
+    sbtn.disabled = true;
+    sbtn.style.opacity = '.4';
+    sbtn.style.cursor  = 'default';
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// CANCEL DO — Admin / SuperAdmin only
+// ════════════════════════════════════════════════════════════
+async function cancelDO(doInputId, reasonInputId) {
+  var isAdm = userRole === 'admin' || userRole === 'superadmin';
+  if (!isAdm) { toast('Access denied — Admins only', 'error'); return; }
+  var doNo   = (document.getElementById(doInputId)||{}).value.trim();
+  var reason = (document.getElementById(reasonInputId)||{}).value.trim();
+  if (!doNo)   { toast('Enter the DO No. to cancel', 'error'); return; }
+  if (!reason) { toast('Enter a reason for cancellation', 'error'); return; }
+  if (!confirm('Cancel DO: ' + doNo + '?\nReason: ' + reason + '\n\nThis cannot be undone.')) return;
+  setTopbar('Cancelling...');
+  try {
+    var upd = { status:'CANCELLED', updated_at:new Date().toISOString() };
+    // Try to save reason — column may or may not exist
+    try { upd.status_reason = reason; } catch(e2){}
+    var r = await sb.from('transport_data').update(upd).eq('do_no', doNo);
+    if (r.error) {
+      // If status_reason column missing, retry without it
+      if (r.error.message && r.error.message.includes('status_reason')) {
+        delete upd.status_reason;
+        r = await sb.from('transport_data').update(upd).eq('do_no', doNo);
+        if (r.error) throw new Error(r.error.message);
+      } else {
+        throw new Error(r.error.message);
+      }
+    }
+    await logActivity('CANCEL','transport_data',null,{do_no:doNo,reason:reason});
+    toast('DO '+doNo+' cancelled','success');
+    var di=document.getElementById(doInputId); if(di) di.value='';
+    var ri=document.getElementById(reasonInputId); if(ri) ri.value='';
+    await loadRecords();
+  } catch(e){ toast('Error: '+e.message,'error'); }
+  setTopbar('');
+}
+
 function onLorryNoInput(){
   var lorryEl=document.getElementById('f2-lorry-no'),placEl=document.getElementById('f2-placement');
   if(!lorryEl||!placEl) return;
@@ -1288,32 +1373,65 @@ async function saveUserN(n) {
     if(!v('f4-mf-no')){toast('MF No. is required','error');return;}
     var ms=document.getElementById('f4-multi-section');
     var isMulti=ms&&ms.style.display!=='none';
+    // Base data — columns that always exist
+    var base4 = {
+      inv_no:v('f4-inv-no'),
+      inv_date:v('f4-inv-date')||null,
+      inv_value:nv('f4-inv-val-total'),
+      mf_no:v('f4-mf-no'),
+      is_multi_so:isMulti,
+      eway_bill_no:v('f4-eway-no'),
+      eway_bill_exp:v('f4-eway-exp')||null,
+      broker_name_u4:v('f4-broker'),
+      broker_no_u4:v('f4-broker-no'),
+      lorry_no_u4:v('f4-lorry-ro'),
+      driver_no_u4:v('f4-driver-ro'),
+      un_point_u4:v('f4-unpoint-ro'),
+      lr_no:v('f4-lr-single'),
+      status:'SEC4_DONE',
+      sec4_by:currentUser.id
+    };
+    // Try to also save SO/LR split columns — ignore error if columns missing
     if(isMulti){
       var rec4=window._selectedRec,adv4=rec4?(parseFloat(rec4.ADVANCE)||0):0,bal4=rec4?(parseFloat(rec4.BAL)||0):0;
       var filled4=0;
       for(var ii=1;ii<=5;ii++){var se=document.getElementById('f4-so-'+ii);if(se&&se.value.trim())filled4++;}
       var advEach4=filled4>0?adv4/filled4:0,balEach4=filled4>0?bal4/filled4:0;
-      Object.assign(data,{inv_no:v('f4-inv-no'),inv_date:v('f4-inv-date')||null,inv_value:nv('f4-inv-val-total'),
-        mf_no:v('f4-mf-no'),is_multi_so:true,
-        eway_bill_no:v('f4-eway-no'),eway_bill_exp:v('f4-eway-exp')||null,
-        broker_name_u4:v('f4-broker'),broker_no_u4:v('f4-broker-no'),
-        lorry_no_u4:v('f4-lorry-ro'),driver_no_u4:v('f4-driver-ro'),un_point_u4:v('f4-unpoint-ro'),
-        eway_bill_no_u4:v('f4-eway-no'),eway_bill_exp_u4:v('f4-eway-exp')||null,
-        so_1:v('f4-so-1'),lr_1:v('f4-lr-1'),so_amt_1:advEach4+balEach4,so_adv_1:advEach4,so_bal_1:balEach4,
-        so_2:v('f4-so-2'),lr_2:v('f4-lr-2'),so_amt_2:advEach4+balEach4,so_adv_2:advEach4,so_bal_2:balEach4,
-        so_3:v('f4-so-3'),lr_3:v('f4-lr-3'),so_amt_3:advEach4+balEach4,so_adv_3:advEach4,so_bal_3:balEach4,
-        so_4:v('f4-so-4'),lr_4:v('f4-lr-4'),so_amt_4:advEach4+balEach4,so_adv_4:advEach4,so_bal_4:balEach4,
-        so_5:v('f4-so-5'),lr_5:v('f4-lr-5'),so_amt_5:advEach4+balEach4,so_adv_5:advEach4,so_bal_5:balEach4,
-        status:'SEC4_DONE',sec4_by:currentUser.id});
+      // Store all SO data as JSON in remarks_u4 field if individual columns missing
+      var soData={};
+      for(var jj=1;jj<=5;jj++){
+        var soVal=v('f4-so-'+jj),lrVal=v('f4-lr-'+jj);
+        if(soVal){soData['so_'+jj]=soVal;soData['lr_'+jj]=lrVal;soData['so_amt_'+jj]=advEach4+balEach4;soData['so_adv_'+jj]=advEach4;soData['so_bal_'+jj]=balEach4;}
+      }
+      Object.assign(base4, soData);
     } else {
-      Object.assign(data,{inv_no:v('f4-inv-no'),inv_date:v('f4-inv-date')||null,inv_value:nv('f4-inv-val-total'),
-        lr_no:v('f4-lr-single'),mf_no:v('f4-mf-no'),is_multi_so:false,lr_no_single:v('f4-lr-single'),
-        eway_bill_no:v('f4-eway-no'),eway_bill_exp:v('f4-eway-exp')||null,
-        broker_name_u4:v('f4-broker'),broker_no_u4:v('f4-broker-no'),
-        lorry_no_u4:v('f4-lorry-ro'),driver_no_u4:v('f4-driver-ro'),un_point_u4:v('f4-unpoint-ro'),
-        so_1:v('f4-so-single'),lr_1:v('f4-lr-single'),so_amt_1:nv('f4-amt-single'),
-        status:'SEC4_DONE',sec4_by:currentUser.id});
+      base4.lr_no_single = v('f4-lr-single');
     }
+    Object.assign(data, base4);
+    // Try save — if SO/LR columns missing, retry without them
+    setTopbar('Saving...');
+    try {
+      var r4 = await sb.from('transport_data').update(data).eq('id', currentRecordId);
+      if (r4.error && r4.error.message && r4.error.message.includes('column')) {
+        // Columns missing — save only safe base columns
+        var safeData = Object.assign({updated_at:new Date().toISOString()}, base4);
+        // Remove any so_N / lr_N keys
+        Object.keys(safeData).forEach(function(k){ if(/^(so|lr|so_amt|so_adv|so_bal)_\d/.test(k)) delete safeData[k]; });
+        var r4b = await sb.from('transport_data').update(safeData).eq('id', currentRecordId);
+        if (r4b.error) throw new Error(r4b.error.message);
+        toast('Section 4 saved (run SQL to enable full SO/LR split saving)','success');
+      } else if (r4.error) {
+        throw new Error(r4.error.message);
+      } else {
+        await logActivity('UPDATE','transport_data',currentRecordId,data);
+        toast('Section 4 saved!','success');
+      }
+      currentRecordId=null; window._selectedRec=null;
+      await loadRecords();
+      showUserSection(4);
+    } catch(e){ toast('Error: '+e.message,'error'); }
+    setTopbar('');
+    return; // exit early — handled above
   }
   if(n===6){
     var rec6=window._selectedRec;
@@ -1413,8 +1531,8 @@ function renderPipelineTable(data) {
   if(!data||!data.length){tbody.innerHTML='<tr><td colspan="9"><div class="empty"><div class="empty-icon">📋</div><div class="empty-text">No active records</div></div></td></tr>';return;}
   var html='';
   data.forEach(function(r){
-    var editTd=isAdmin?('<td>'+btn('btn-secondary btn-sm','openEditFromPipeline("'+r.ID+'")','✏ Edit')+'</td>'):'<td></td>';
-    var delTd=isAdmin?('<td>'+btn('btn-danger btn-sm','delRecord("'+r.ID+'")','Del')+'</td>'):'<td></td>';
+    var editTd=isAdmin?('<td><button class="btn btn-secondary btn-sm" onclick="openEditFromPipeline(this.dataset.id)" data-id="'+r.ID+'">✏ Edit</button></td>'):'<td></td>';
+    var delTd =isAdmin?('<td><button class="btn btn-danger btn-sm"    onclick="delRecord(this.dataset.id)"           data-id="'+r.ID+'">Del</button></td>'):'<td></td>';
     html+='<tr>'
       +'<td><span class="id-chip">'+r.ID.toString().slice(-8)+'</span></td>'
       +'<td><strong>'+(r.DO_NO||'—')+'</strong></td>'
@@ -1496,6 +1614,7 @@ function statusBadge(raw) {
   if(s==='SEC5_DONE')    return '<span class="badge badge-blue">Waiting U6</span>';
   if(s==='SEC6_DONE')    return '<span class="badge badge-amber">Waiting U7</span>';
   if(s==='COMPLETE')     return '<span class="badge badge-green">Complete</span>';
+  if(s==='CANCELLED')    return '<span class="badge badge-red">Cancelled</span>';
   return '<span class="badge badge-amber">'+s+'</span>';
 }
 
@@ -1545,8 +1664,8 @@ async function renderDbPanel(key) {
     data.forEach(function(row){
       var cells='';
       cfg.cols.forEach(function(c){cells+='<td>'+(row[c]||'—')+'</td>';});
-      var delBtn='<button class="btn btn-danger btn-sm" onclick="dbDel(\''+key+'\',\''+row.ID+'\')">Del</button>';
-      var editBtn='<button class="btn btn-secondary btn-sm" onclick=\'openEditModal("'+key+'",'+JSON.stringify(row)+')\'>Edit</button>';
+      var delBtn='<button class="btn btn-danger btn-sm" onclick="dbDel(this.dataset.key,this.dataset.id)" data-key="'+key+'" data-id="'+row.ID+'">Del</button>';
+      var editBtn='<button class="btn btn-secondary btn-sm" onclick="openEditModal(this.dataset.key,JSON.parse(decodeURIComponent(this.dataset.row)))" data-key="'+key+'" data-row="'+encodeURIComponent(JSON.stringify(row))+'">Edit</button>';
       rowsHtml+='<tr>'+cells+'<td>'+editBtn+' '+delBtn+'</td></tr>';
     });
     tbody.innerHTML=rowsHtml;
@@ -1623,9 +1742,13 @@ async function dbDel(key,id) {
 // ════════════════════════════════════════════════════════════
 function showReportsPanel() {
   var el=document.getElementById('panel-reports'); if(!el) return;
-  var coOpts='<option value="">All Companies</option>';
-  var uniqueConsignors=[...new Set(records.map(function(r){return r.CONSIGNOR_NAME;}).filter(Boolean))];
-  uniqueConsignors.forEach(function(c){coOpts+='<option value="'+c+'">'+c+'</option>';});
+  var coOpts='<option value="">All Consignees</option>';
+  var uniqueConsignees=[...new Set(
+    records.map(function(r){return r.CONSIGNEE_NAME;})
+    .concat(archive.map(function(r){return r.CONSIGNEE_NAME;}))
+    .filter(Boolean)
+  )].sort();
+  uniqueConsignees.forEach(function(c){coOpts+='<option value="'+c+'">'+c+'</option>';});
   var destOpts='<option value="">All Destinations</option>';
   (master.destinations||[]).forEach(function(d){destOpts+='<option value="'+d.DESTINATION+'">'+d.DESTINATION+'</option>';});
   var gradeOpts='<option value="">All Grades</option>';
@@ -1634,13 +1757,14 @@ function showReportsPanel() {
     '<div class="rpt-print-header" id="rpt-print-hdr"><div style="font-size:18px;font-weight:800;color:var(--navy)">MRPL — Transport Management System</div><div style="font-size:12px;color:var(--muted);margin-top:4px" id="rpt-print-subtitle">Master Report</div></div>'
     +'<div class="rpt-filter-bar"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Filters</div>'
     +'<div class="rpt-filter-grid">'
-    +'<div class="form-group"><label>Company</label><select id="rf-company">'+coOpts+'</select></div>'
+    +'<div class="form-group"><label>Consignee</label><select id="rf-company">'+coOpts+'</select></div>'
     +'<div class="form-group"><label>Date From</label><input type="date" id="rf-date-from"></div>'
     +'<div class="form-group"><label>Date To</label><input type="date" id="rf-date-to"></div>'
     +'<div class="form-group"><label>Lorry No.</label><input id="rf-lorry" placeholder="e.g. KA19AF6544"></div>'
     +'<div class="form-group"><label>MF No.</label><input id="rf-mf" placeholder="MF No."></div>'
     +'<div class="form-group"><label>Destination</label><select id="rf-dest">'+destOpts+'</select></div>'
     +'<div class="form-group"><label>Grade</label><select id="rf-grade">'+gradeOpts+'</select></div>'
+    +'<div class="form-group"><label>Record Status</label><select id="rf-status"><option value="">All Records</option><option value="PENDING">Pending (Active)</option><option value="COMPLETE">Completed</option><option value="CANCELLED">Cancelled</option></select></div>'
     +'</div>'
     +'<div class="rpt-actions">'
     +'<button class="btn btn-amber" onclick="applyReportFilters()">Apply Filters</button>'
@@ -1671,20 +1795,25 @@ function applyReportFilters() {
     lorryNo:(document.getElementById('rf-lorry')||{}).value||'',
     mfNo:(document.getElementById('rf-mf')||{}).value||'',
     destination:(document.getElementById('rf-dest')||{}).value||'',
-    grade:(document.getElementById('rf-grade')||{}).value||''
+    grade:(document.getElementById('rf-grade')||{}).value||'',
+    statusFilter:(document.getElementById('rf-status')||{}).value||''
   };
   reportFilters=f;
-  // Combine active records + archive for report
   var allData = records.map(function(r){ return Object.assign({},r,{_source:'ACTIVE'}); })
     .concat(archive.map(function(r){ return Object.assign({},r,{_source:'ARCHIVE'}); }));
   var d=allData.filter(function(r){
-    if(f.company     && r.CONSIGNOR_NAME!==f.company) return false;
+    // Consignee filter (was company/consignor)
+    if(f.company     && r.CONSIGNEE_NAME!==f.company) return false;
     if(f.lorryNo     && !String(r.LORRY_NO||'').toUpperCase().includes(f.lorryNo.toUpperCase())) return false;
     if(f.mfNo        && !String(r.MF_NO||'').includes(f.mfNo)) return false;
     if(f.destination && r.DESTINATION!==f.destination) return false;
     if(f.grade       && r.GRADE!==f.grade) return false;
     if(f.dateFrom) { var sd=new Date(r.SO_DATE||r.CREATED_AT); if(isNaN(sd)||sd<new Date(f.dateFrom)) return false; }
     if(f.dateTo)   { var ed=new Date(r.SO_DATE||r.CREATED_AT); if(isNaN(ed)||ed>new Date(f.dateTo+'T23:59:59')) return false; }
+    // Status filter
+    if(f.statusFilter==='PENDING')   { if(r._source!=='ACTIVE'||r.STATUS==='CANCELLED') return false; }
+    if(f.statusFilter==='COMPLETE')  { if(r._source!=='ARCHIVE') return false; }
+    if(f.statusFilter==='CANCELLED') { if(r.STATUS!=='CANCELLED') return false; }
     return true;
   });
   reportData=d;
@@ -1694,7 +1823,7 @@ function applyReportFilters() {
   renderRptTable();
 }
 function resetReportFilters(){
-  ['rf-company','rf-date-from','rf-date-to','rf-lorry','rf-mf','rf-dest','rf-grade'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  ['rf-company','rf-date-from','rf-date-to','rf-lorry','rf-mf','rf-dest','rf-grade','rf-status'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   applyReportFilters();
 }
 function switchRptTab(tab){
@@ -1720,7 +1849,7 @@ function renderRptSummaryCards(){
 var moneyKeysRpt={TOTAL_FREIGHT:1,MF_FREIGHT:1,ADVANCE:1,TOTAL_NEFT:1,LM:1,PM:1,UN_EXP:1,MRPL_DIESEL:1,BAL:1,INV_VALUE:1,INS_PREMIUM:1,PMT_RATE:1,TOTAL_PMT:1,SO_AMT_1:1,SO_AMT_2:1,SO_AMT_3:1,SO_AMT_4:1,SO_AMT_5:1,SO_ADV_1:1,SO_ADV_2:1,SO_ADV_3:1,SO_ADV_4:1,SO_ADV_5:1,SO_BAL_1:1,SO_BAL_2:1,SO_BAL_3:1,SO_BAL_4:1,SO_BAL_5:1,UNLOADING_OTHERS:1};
 function getRptColumns(){
   var cols={
-    freight:[{k:'DO_NO',l:'DO No'},{k:'SO_NO',l:'SO No'},{k:'SO_DATE',l:'Date'},{k:'CONSIGNOR_NAME',l:'Consignor'},{k:'CONSIGNEE_NAME',l:'Consignee'},{k:'DESTINATION',l:'Destination'},{k:'LORRY_NO',l:'Lorry No'},{k:'BAGS',l:'Bags'},{k:'A_QTY',l:'MT'},{k:'GRADE',l:'Grade'},{k:'PMT_RATE',l:'PMT Rate'},{k:'UNLOADING_OTHERS',l:'Unl.Others'},{k:'TOTAL_PMT',l:'Total PMT'},{k:'C_QTY',l:'C-Qty'},{k:'TOTAL_FREIGHT',l:'Total Frt'},{k:'LM',l:'LM'},{k:'PM',l:'PM'},{k:'UN_EXP',l:'UN Exp'},{k:'MF_FREIGHT',l:'MF Frt'},{k:'MRPL_DIESEL',l:'MRPL Diesel'},{k:'_source',l:'Source'}],
+    freight:[{k:'DO_NO',l:'DO No'},{k:'SO_NO',l:'SO No'},{k:'SO_DATE',l:'Date'},{k:'CONSIGNOR_NAME',l:'Consignor'},{k:'CONSIGNEE_NAME',l:'Consignee'},{k:'DESTINATION',l:'Destination'},{k:'LORRY_NO',l:'Lorry No'},{k:'GP_NO',l:'GP No'},{k:'BAGS',l:'Bags'},{k:'A_QTY',l:'MT'},{k:'GRADE',l:'Grade'},{k:'PMT_RATE',l:'PMT Rate'},{k:'UNLOADING_OTHERS',l:'Unl.Others'},{k:'TOTAL_PMT',l:'Total PMT'},{k:'C_QTY',l:'C-Qty'},{k:'TOTAL_FREIGHT',l:'Total Frt'},{k:'LM',l:'LM'},{k:'PM',l:'PM'},{k:'UN_EXP',l:'UN Exp'},{k:'MF_FREIGHT',l:'MF Frt'},{k:'MRPL_DIESEL',l:'MRPL Diesel'},{k:'_source',l:'Source'}],
     payment:[{k:'DO_NO',l:'DO No'},{k:'SO_DATE',l:'Date'},{k:'CONSIGNEE_NAME',l:'Consignee'},{k:'LORRY_NO',l:'Lorry No'},{k:'TOTAL_FREIGHT',l:'Total Frt'},{k:'LM',l:'LM'},{k:'PM',l:'PM'},{k:'MF_FREIGHT',l:'MF Frt'},{k:'MRPL_DIESEL',l:'MRPL Diesel'},{k:'BAL',l:'BAL'},{k:'ADVANCE',l:'Advance'},{k:'TOTAL_NEFT',l:'Total NEFT'},{k:'ADV_AC_HOLDER',l:'Adv Holder'},{k:'ADV_ACC_NO',l:'Acc No'},{k:'ADV_IFSC',l:'IFSC'},{k:'_source',l:'Source'}],
     invoice:[{k:'DO_NO',l:'DO No'},{k:'SO_DATE',l:'Date'},{k:'CONSIGNEE_NAME',l:'Consignee'},{k:'LORRY_NO',l:'Lorry No'},{k:'MF_NO',l:'MF No'},{k:'IS_MULTI_SO',l:'Multi SO'},{k:'SO_1',l:'SO 1'},{k:'LR_1',l:'LR 1'},{k:'SO_ADV_1',l:'Adv 1'},{k:'SO_BAL_1',l:'Bal 1'},{k:'SO_2',l:'SO 2'},{k:'LR_2',l:'LR 2'},{k:'INV_NO',l:'Inv No'},{k:'INV_DATE',l:'Inv Date'},{k:'INV_VALUE',l:'Inv Value'},{k:'EWAY_BILL_NO',l:'E-Way Bill'},{k:'BROKER_NAME_U4',l:'Broker'},{k:'_source',l:'Source'}],
     insurance:[{k:'DO_NO',l:'DO No'},{k:'SO_DATE',l:'Date'},{k:'CONSIGNEE_NAME',l:'Consignee'},{k:'LORRY_NO',l:'Lorry No'},{k:'LR_NO',l:'LR No'},{k:'MF_NO',l:'MF No'},{k:'INV_NO',l:'Inv No'},{k:'INV_VALUE',l:'Inv Value'},{k:'INV_DATE',l:'Inv Date'},{k:'INS_NUM',l:'Ins No'},{k:'INS_PREMIUM',l:'Premium'},{k:'BROKER_NAME_U6',l:'Ins Broker'},{k:'UNLOADING_DATE',l:'Unload Date'},{k:'_source',l:'Source'}],
