@@ -804,12 +804,12 @@ function getPendingForUser(n) {
     var st = needStatus[n]; if (!st) return [];
     filter = function(r){ return String(r.STATUS||'').trim()===st; };
   }
-  // Always exclude cancelled
   return records.filter(function(r){
     return filter(r) && String(r.STATUS||'').trim()!=='CANCELLED';
   }).map(function(r){
     return {id:r.ID,do_no:r.DO_NO,consignor:r.CONSIGNOR_NAME,consignee:r.CONSIGNEE_NAME,
-            destination:r.DESTINATION,grade:r.GRADE||'',bags:r.BAGS,a_qty:r.A_QTY||'',lorry:r.LORRY_NO||''};
+            destination:r.DESTINATION,unloading:r.UNLOADING||r.DESTINATION||'',
+            grade:r.GRADE||'',bags:r.BAGS,a_qty:r.A_QTY||'',lorry:r.LORRY_NO||''};
   });
 }
 
@@ -827,22 +827,45 @@ function renderDOSelector(userNum, pendingDOs) {
       +'<button class="btn btn-secondary" style="margin-top:8px" onclick="loadRecords().then(function(){renderUserForm('+userNum+')})">↻ Refresh</button>'
       +'</div>';
   }
-  var opts = '<option value="">— Select DO No. —</option>';
-  pendingDOs.forEach(function(d){
-    var aqty = d.bags ? (d.bags/40).toFixed(3) : '—';
-    opts += '<option value="'+d.id+'">'
-          +d.do_no+' | '+d.consignee
-          +' | Bags:'+( d.bags||'—')
-          +' | '+aqty+' MT'
-          +(d.grade?' | '+d.grade:'')
-          +' | '+(d.destination||'—')
-          +'</option>';
+  // Sort by unloading point alphabetically
+  var sorted = pendingDOs.slice().sort(function(a,b){
+    return String(a.unloading||a.destination||'').localeCompare(String(b.unloading||b.destination||''));
   });
+
+  // Build alphabet jump buttons from unique first letters of unloading
+  var letters = [];
+  sorted.forEach(function(d){
+    var L = String(d.unloading||d.destination||'').charAt(0).toUpperCase();
+    if (L && letters.indexOf(L) < 0) letters.push(L);
+  });
+  var alphaHtml = '';
+  if (letters.length > 1) {
+    alphaHtml = '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;">'
+      + letters.map(function(L){
+          return '<button class="btn btn-secondary btn-sm" style="min-width:30px;padding:3px 8px;font-weight:800;" onclick="jumpToLetter(\''+L+'\')" title="Jump to '+L+'">'+L+'</button>';
+        }).join('')
+      + '</div>';
+  }
+
+  var opts = '<option value="">— Select DO No. —</option>';
+  sorted.forEach(function(d){
+    var aqty = d.bags ? (d.bags/40).toFixed(3) : '—';
+    opts += '<option value="'+d.id+'" data-unloading="'+escHtml(String(d.unloading||d.destination||''))+'">'
+          + d.do_no
+          + ' | ' + (d.consignee||'—')
+          + ' | Bags:' + (d.bags||'—')
+          + ' | ' + aqty + ' MT'
+          + (d.grade ? ' | '+d.grade : '')
+          + ' | ' + (d.unloading||d.destination||'—')
+          + '</option>';
+  });
+
   return '<div class="do-selector">'
-    +'<div class="do-selector-title">📋 Select DO Number — '+pendingDOs.length+' Pending</div>'
+    +'<div class="do-selector-title">📋 Select DO Number — '+pendingDOs.length+' Pending (sorted by Unloading)</div>'
+    + alphaHtml
     +'<div class="do-selector-row">'
     +'<div class="form-group"><label>Pending DO Numbers</label>'
-    +'<select id="do-select" onchange="onDOSelect()">'+opts+'</select></div>'
+    +'<select id="do-select" onchange="onDOSelect()" size="1">'+opts+'</select></div>'
     +'<button class="btn btn-secondary" onclick="loadRecords().then(function(){renderUserForm('+userNum+')})">↻ Refresh</button>'
     +'</div>'
     +'<div class="do-ref" id="do-ref">'
@@ -913,52 +936,113 @@ function renderUser1Form() {
 
 function renderUser2Form() {
   var isAdmin = userRole === 'admin' || userRole === 'superadmin';
-  var updateBlock = isAdmin
-    ? '<div class="form-block update-block">'
-        +fb('✏️ Update Existing Record (by DO No.)')
-        +'<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Type any DO No. to update Lorry No, GP No, GP Date and Lorry Starters.</div>'
-        +grid([fg('DO No. to Update',fi('f2-upd-do','Enter DO No.')),fg('Lorry No.',fi('f2-upd-lorry','e.g. KA01AB1234')),fg('GP No.',fi('f2-upd-gp-no','Gate Pass No.')),fg('GP Date','<input type="datetime-local" id="f2-upd-gp-date">'),fg('Lorry Starters',fi('f2-upd-starters','Starter details'))])
-        +actions(btn('btn-secondary','saveUser2Update()','Update Record'))
-        +'</div>'
-    : '';
 
-  // Cancel DO block — admin only
+  // Get all pending DOs for section 2
+  var pending = getPendingForUser(2);
+
+  // Cancel block — admin only — simple dropdown + reason
   var cancelBlock = isAdmin
-    ? '<div class="form-block" style="border-color:var(--red);border-width:2px;">'
-        +fb('🚫 Cancel a DO (Admin Only)')
-        +'<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Enter the DO No. to cancel. Cancelled DOs are removed from all user queues.</div>'
-        +grid([fg('DO No. to Cancel',fi('f2-cancel-do','Enter DO No. to cancel')),fg('Reason for Cancellation',fi('f2-cancel-reason','e.g. Vehicle not available'))])
-        +actions('<button class="btn btn-danger" onclick="cancelDO(\'f2-cancel-do\',\'f2-cancel-reason\')">🚫 Cancel This DO</button>')
-        +'</div>'
+    ? '<div class="form-block" style="border:2px solid var(--red);">'
+        + fb('🚫 Cancel a DO — Admin Only')
+        + '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Select the DO to cancel and give a reason. It will be removed from all queues immediately.</div>'
+        + grid([
+            fg('Select DO to Cancel',
+              '<select id="f2-cancel-sel"><option value="">— Select DO No. —</option>'
+              + pending.map(function(d){ return '<option value="'+d.do_no+'">'+d.do_no+' | '+d.consignee+'</option>'; }).join('')
+              +'</select>'
+            ),
+            fg('Reason *', fi('f2-cancel-reason','e.g. Vehicle not available'))
+          ])
+        + actions('<button class="btn btn-danger" onclick="cancelDOFromDropdown()">🚫 Cancel Selected DO</button>')
+        + '</div>'
     : '';
 
-  return updateBlock + cancelBlock + block('🚛 User 2 — Lorry & Gate Pass',
-    grid([
-      fg('Lorry No. *','<input id="f2-lorry-no" placeholder="e.g. KA01AB1234" style="text-transform:uppercase" oninput="onLorryNoInput()">'),
-      fg('Driver No.', fi('f2-driver-no','Driver mobile no.')),
-      fg('Lorry Placement Date & Time (Auto)', fc('f2-placement','Auto-fills when Lorry No. entered')),
-      fg('Lorry Starters', fi('f2-starters','Starter details')),
-      fg('GP No.', fi('f2-gp-no','Gate Pass No.')),
-      fg('GP Time (Auto = Today)', fc('f2-gp-time',''))
-    ]),
-    // Confirm checkbox + Save button
-    '<div style="margin-top:16px;padding:14px;background:var(--greenbg);border:1.5px solid #86efac;border-radius:var(--radius);display:flex;align-items:center;gap:12px;">'
-    +'<input type="checkbox" id="f2-confirm-cb" style="width:18px;height:18px;accent-color:var(--green);cursor:pointer;" onchange="onUser2ConfirmChange()">'
-    +'<label for="f2-confirm-cb" style="font-size:13px;font-weight:700;color:var(--green);cursor:pointer;text-transform:none;letter-spacing:0;">✓ Lorry confirmed — vehicle has been placed and gate pass issued. Move to User 3.</label>'
-    +'</div>'
-    +actions('<button class="btn btn-amber" id="f2-save-btn" onclick="saveUserN(2)" disabled style="opacity:.4;cursor:default;">Save Lorry Details →</button>')
-  );
+  // Build the checklist table of all pending DOs
+  if (!pending.length) {
+    return cancelBlock
+      + '<div class="form-block"><div class="empty" style="padding:30px">'
+      + '<div class="empty-icon">⏳</div>'
+      + '<div class="empty-text">No pending DOs for Section 2.</div>'
+      + '</div>'
+      + '<button class="btn btn-secondary" style="margin-top:8px" onclick="loadRecords().then(function(){renderUserForm(2)})">↻ Refresh</button>'
+      + '</div>';
+  }
+
+  var rows = '';
+  pending.forEach(function(d, idx) {
+    var aqty = d.bags ? (d.bags/40).toFixed(3) : '—';
+    rows += '<tr id="u2row-'+d.id+'">'
+      // Checkbox column
+      + '<td style="text-align:center;padding:10px 8px;">'
+      +   '<input type="checkbox" id="u2cb-'+d.id+'" class="u2-cb" style="width:18px;height:18px;accent-color:var(--green);cursor:pointer;" onchange="onU2CbChange(\''+d.id+'\')">'
+      + '</td>'
+      // DO info
+      + '<td style="font-family:var(--mono);font-weight:700;color:var(--amber);padding:10px 8px;">'+d.do_no+'</td>'
+      + '<td style="padding:10px 8px;">'+d.consignee+'</td>'
+      + '<td style="font-family:var(--mono);padding:10px 8px;">'+( d.bags||'—')+'</td>'
+      + '<td style="font-family:var(--mono);padding:10px 8px;">'+aqty+' MT</td>'
+      + '<td style="padding:10px 8px;">'+(d.grade||'—')+'</td>'
+      + '<td style="padding:10px 8px;">'+(d.destination||'—')+'</td>'
+      // Lorry No input (only enabled when checked)
+      + '<td style="padding:6px 8px;"><input id="u2-lorry-'+d.id+'" placeholder="Lorry No." style="width:130px;text-transform:uppercase;" disabled></td>'
+      + '<td style="padding:6px 8px;"><input id="u2-driver-'+d.id+'" placeholder="Driver No." style="width:120px;" disabled></td>'
+      + '<td style="padding:6px 8px;"><input id="u2-gp-'+d.id+'" placeholder="GP No." style="width:100px;" disabled></td>'
+      + '</tr>';
+  });
+
+  var tableHtml = '<div style="overflow-x:auto;border-radius:var(--radius2);border:1px solid var(--border);box-shadow:var(--shadow);margin-bottom:14px;">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px;background:var(--white);">'
+    + '<thead><tr style="background:var(--navy);">'
+    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;text-align:center;white-space:nowrap;">✓ Confirm</th>'
+    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;">DO No.</th>'
+    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Consignee</th>'
+    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Bags</th>'
+    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">A-Qty MT</th>'
+    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Grade</th>'
+    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Destination</th>'
+    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Lorry No. *</th>'
+    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Driver No.</th>'
+    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">GP No.</th>'
+    + '</tr></thead>'
+    + '<tbody id="u2-tbody">'+rows+'</tbody>'
+    + '</table></div>';
+
+  var noteHtml = '<div style="background:var(--amberlt);border:1px solid #fcd34d;border-radius:var(--radius);padding:10px 14px;font-size:11px;font-weight:600;color:#92400e;margin-bottom:14px;">'
+    + '✓ Tick the checkbox next to each DO whose lorry has arrived and gate pass is issued. Fill Lorry No. for each ticked DO. Un-ticked DOs stay pending.'
+    + '</div>';
+
+  var footerHtml = '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
+    + '<button class="btn btn-amber" id="u2-save-all-btn" onclick="saveUser2Checked()">Save Confirmed DOs →</button>'
+    + '<span id="u2-checked-count" style="font-size:11px;font-weight:700;color:var(--muted);">0 selected</span>'
+    + '<button class="btn btn-secondary" onclick="loadRecords().then(function(){renderUserForm(2)})">↻ Refresh</button>'
+    + '</div>';
+
+  return cancelBlock
+    + '<div class="form-block">'
+    + fb('🚛 User 2 — Lorry & Gate Pass Confirmation (' + pending.length + ' pending)')
+    + noteHtml
+    + tableHtml
+    + footerHtml
+    + '</div>';
 }
 
 function renderUser3Form() {
   var isAdmin = userRole === 'admin' || userRole === 'superadmin';
+  var pending3 = getPendingForUser(3);
   var cancelBlock = isAdmin
-    ? '<div class="form-block" style="border-color:var(--red);border-width:2px;">'
-        +fb('🚫 Cancel a DO (Admin Only)')
-        +'<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Enter the DO No. to cancel. Cancelled DOs are removed from all queues.</div>'
-        +grid([fg('DO No. to Cancel',fi('f3-cancel-do','Enter DO No. to cancel')),fg('Reason for Cancellation',fi('f3-cancel-reason','e.g. Order cancelled by client'))])
-        +actions('<button class="btn btn-danger" onclick="cancelDO(\'f3-cancel-do\',\'f3-cancel-reason\')">🚫 Cancel This DO</button>')
-        +'</div>'
+    ? '<div class="form-block" style="border:2px solid var(--red);">'
+        + fb('🚫 Cancel a DO — Admin Only')
+        + '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Select the DO and give a reason. It will be cancelled and removed from all queues.</div>'
+        + grid([
+            fg('Select DO to Cancel',
+              '<select id="f3-cancel-sel"><option value="">— Select DO No. —</option>'
+              + pending3.map(function(d){ return '<option value="'+d.do_no+'">'+d.do_no+' | '+d.consignee+'</option>'; }).join('')
+              +'</select>'
+            ),
+            fg('Reason *', fi('f3-cancel-reason','e.g. Order cancelled by client'))
+          ])
+        + actions('<button class="btn btn-danger" onclick="cancelDOFromDropdown3()">🚫 Cancel Selected DO</button>')
+        + '</div>'
     : '';
   return cancelBlock + block('💰 User 3 — Freight & Payment',
     grid([
@@ -1233,55 +1317,98 @@ function calcBrAmt(){ sv('f7-br-amt',(gv('f7-br-rate')*gv('f7-cqty-ro')).toFixed
 function onInsNumSelect(){var sel=document.getElementById('f6-ins-num-select'),inp=document.getElementById('f6-ins-num');if(sel&&sel.value&&inp){inp.value=sel.value;calcInsPremium();}}
 function calcInsPremium(){ sv('f6-ins-pre',(gv('f6-inv-val-ro')*gv('f6-ins-num')/100000).toFixed(2)); }
 // ════════════════════════════════════════════════════════════
-// USER 2 CONFIRM CHECKBOX — must tick to enable Save button
+// USER 2 — CHECKBOX LIST HANDLERS
 // ════════════════════════════════════════════════════════════
-function onUser2ConfirmChange() {
-  var cb  = document.getElementById('f2-confirm-cb');
-  var sbtn = document.getElementById('f2-save-btn');
-  if (!cb || !sbtn) return;
-  if (cb.checked) {
-    sbtn.disabled = false;
-    sbtn.style.opacity = '1';
-    sbtn.style.cursor  = 'pointer';
-  } else {
-    sbtn.disabled = true;
-    sbtn.style.opacity = '.4';
-    sbtn.style.cursor  = 'default';
+function onU2CbChange(id) {
+  // Enable/disable lorry input row based on checkbox
+  var cb     = document.getElementById('u2cb-'+id);
+  var lorry  = document.getElementById('u2-lorry-'+id);
+  var driver = document.getElementById('u2-driver-'+id);
+  var gp     = document.getElementById('u2-gp-'+id);
+  var row    = document.getElementById('u2row-'+id);
+  var checked = cb && cb.checked;
+  if (lorry)  lorry.disabled  = !checked;
+  if (driver) driver.disabled = !checked;
+  if (gp)     gp.disabled     = !checked;
+  if (row) row.style.background = checked ? 'var(--greenbg)' : '';
+  // Update count
+  var total = document.querySelectorAll('.u2-cb:checked').length;
+  var el = document.getElementById('u2-checked-count');
+  if (el) el.textContent = total + ' selected';
+}
+
+async function saveUser2Checked() {
+  var checked = document.querySelectorAll('.u2-cb:checked');
+  if (!checked.length) { toast('Tick at least one DO to confirm', 'error'); return; }
+  var errors = [];
+  var saved  = 0;
+  setTopbar('Saving...');
+  for (var i = 0; i < checked.length; i++) {
+    var id     = checked[i].id.replace('u2cb-','');
+    var lorry  = (document.getElementById('u2-lorry-'+id)||{}).value.trim().toUpperCase();
+    var driver = (document.getElementById('u2-driver-'+id)||{}).value.trim();
+    var gp     = (document.getElementById('u2-gp-'+id)||{}).value.trim();
+    if (!lorry) { errors.push('Lorry No. missing for one of the ticked DOs'); continue; }
+    var now = new Date().toISOString();
+    var upd = {
+      lorry_no:lorry, driver_no:driver, gp_no:gp,
+      gp_time:now, lorry_placement:now,
+      lorry_no_mirror:lorry,
+      status:'SEC2_DONE', sec2_by:currentUser.id,
+      updated_at:now
+    };
+    var r = await sb.from('transport_data').update(upd).eq('id', id);
+    if (r.error) errors.push('Failed for ID '+id+': '+r.error.message);
+    else saved++;
+  }
+  setTopbar('');
+  if (errors.length) toast(errors[0], 'error');
+  if (saved > 0) {
+    toast(saved+' DO(s) confirmed and moved to User 3!', 'success');
+    await loadRecords();
+    renderUserForm(2);
   }
 }
 
-// ════════════════════════════════════════════════════════════
-// CANCEL DO — Admin / SuperAdmin only
-// ════════════════════════════════════════════════════════════
-async function cancelDO(doInputId, reasonInputId) {
-  var isAdm = userRole === 'admin' || userRole === 'superadmin';
-  if (!isAdm) { toast('Access denied — Admins only', 'error'); return; }
-  var doNo   = (document.getElementById(doInputId)||{}).value.trim();
-  var reason = (document.getElementById(reasonInputId)||{}).value.trim();
-  if (!doNo)   { toast('Enter the DO No. to cancel', 'error'); return; }
+// Cancel from dropdown (User 2)
+async function cancelDOFromDropdown() {
+  var sel    = document.getElementById('f2-cancel-sel');
+  var reason = (document.getElementById('f2-cancel-reason')||{}).value.trim();
+  var doNo   = sel ? sel.value.trim() : '';
+  if (!doNo)   { toast('Select a DO to cancel', 'error'); return; }
   if (!reason) { toast('Enter a reason for cancellation', 'error'); return; }
-  if (!confirm('Cancel DO: ' + doNo + '?\nReason: ' + reason + '\n\nThis cannot be undone.')) return;
+  if (!confirm('Cancel DO: '+doNo+'?\nReason: '+reason+'\n\nThis cannot be undone.')) return;
+  await doCancelByDoNo(doNo, reason);
+  await loadRecords();
+  renderUserForm(2);
+}
+
+// Cancel from dropdown (User 3)
+async function cancelDOFromDropdown3() {
+  var sel    = document.getElementById('f3-cancel-sel');
+  var reason = (document.getElementById('f3-cancel-reason')||{}).value.trim();
+  var doNo   = sel ? sel.value.trim() : '';
+  if (!doNo)   { toast('Select a DO to cancel', 'error'); return; }
+  if (!reason) { toast('Enter a reason for cancellation', 'error'); return; }
+  if (!confirm('Cancel DO: '+doNo+'?\nReason: '+reason+'\n\nThis cannot be undone.')) return;
+  await doCancelByDoNo(doNo, reason);
+  await loadRecords();
+  renderUserForm(3);
+}
+
+async function doCancelByDoNo(doNo, reason) {
   setTopbar('Cancelling...');
   try {
     var upd = { status:'CANCELLED', updated_at:new Date().toISOString() };
-    // Try to save reason — column may or may not exist
     try { upd.status_reason = reason; } catch(e2){}
     var r = await sb.from('transport_data').update(upd).eq('do_no', doNo);
-    if (r.error) {
-      // If status_reason column missing, retry without it
-      if (r.error.message && r.error.message.includes('status_reason')) {
-        delete upd.status_reason;
-        r = await sb.from('transport_data').update(upd).eq('do_no', doNo);
-        if (r.error) throw new Error(r.error.message);
-      } else {
-        throw new Error(r.error.message);
-      }
+    if (r.error && r.error.message && r.error.message.includes('status_reason')) {
+      delete upd.status_reason;
+      r = await sb.from('transport_data').update(upd).eq('do_no', doNo);
     }
+    if (r.error) throw new Error(r.error.message);
     await logActivity('CANCEL','transport_data',null,{do_no:doNo,reason:reason});
     toast('DO '+doNo+' cancelled','success');
-    var di=document.getElementById(doInputId); if(di) di.value='';
-    var ri=document.getElementById(reasonInputId); if(ri) ri.value='';
-    await loadRecords();
   } catch(e){ toast('Error: '+e.message,'error'); }
   setTopbar('');
 }
@@ -2182,6 +2309,20 @@ async function logActivity(action, table, recordId, newData){
 // ════════════════════════════════════════════════════════════
 // UI HELPERS
 // ════════════════════════════════════════════════════════════
+// Jump DO dropdown to first option starting with letter
+function jumpToLetter(letter) {
+  var sel = document.getElementById('do-select');
+  if (!sel) return;
+  for (var i = 0; i < sel.options.length; i++) {
+    var ul = sel.options[i].getAttribute('data-unloading') || sel.options[i].text;
+    if (String(ul).toUpperCase().charAt(0) === letter) {
+      sel.selectedIndex = i;
+      sel.dispatchEvent(new Event('change'));
+      break;
+    }
+  }
+}
+
 function setTopbar(msg){
   var tb=document.getElementById('topbar-right');if(!tb)return;
   tb.innerHTML=msg?'<span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);font-weight:600">'+(msg.includes('...')?'<span class="spinner" style="border-top-color:var(--amber);border-color:var(--border2);"></span>':'')+msg+'</span>':'';
