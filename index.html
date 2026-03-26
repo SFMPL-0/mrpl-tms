@@ -832,21 +832,6 @@ function renderDOSelector(userNum, pendingDOs) {
     return String(a.unloading||a.destination||'').localeCompare(String(b.unloading||b.destination||''));
   });
 
-  // Build alphabet jump buttons from unique first letters of unloading
-  var letters = [];
-  sorted.forEach(function(d){
-    var L = String(d.unloading||d.destination||'').charAt(0).toUpperCase();
-    if (L && letters.indexOf(L) < 0) letters.push(L);
-  });
-  var alphaHtml = '';
-  if (letters.length > 1) {
-    alphaHtml = '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;">'
-      + letters.map(function(L){
-          return '<button class="btn btn-secondary btn-sm" style="min-width:30px;padding:3px 8px;font-weight:800;" onclick="jumpToLetter(\''+L+'\')" title="Jump to '+L+'">'+L+'</button>';
-        }).join('')
-      + '</div>';
-  }
-
   var opts = '<option value="">— Select DO No. —</option>';
   sorted.forEach(function(d){
     var aqty = d.bags ? (d.bags/40).toFixed(3) : '—';
@@ -861,11 +846,10 @@ function renderDOSelector(userNum, pendingDOs) {
   });
 
   return '<div class="do-selector">'
-    +'<div class="do-selector-title">📋 Select DO Number — '+pendingDOs.length+' Pending (sorted by Unloading)</div>'
-    + alphaHtml
+    +'<div class="do-selector-title">📋 Select DO Number — '+pendingDOs.length+' Pending (sorted by Unloading A→Z)</div>'
     +'<div class="do-selector-row">'
     +'<div class="form-group"><label>Pending DO Numbers</label>'
-    +'<select id="do-select" onchange="onDOSelect()" size="1">'+opts+'</select></div>'
+    +'<select id="do-select" onchange="onDOSelect()">'+opts+'</select></div>'
     +'<button class="btn btn-secondary" onclick="loadRecords().then(function(){renderUserForm('+userNum+')})">↻ Refresh</button>'
     +'</div>'
     +'<div class="do-ref" id="do-ref">'
@@ -936,15 +920,13 @@ function renderUser1Form() {
 
 function renderUser2Form() {
   var isAdmin = userRole === 'admin' || userRole === 'superadmin';
-
-  // Get all pending DOs for section 2
   var pending = getPendingForUser(2);
 
-  // Cancel block — admin only — simple dropdown + reason
+  // Cancel block — admin only
   var cancelBlock = isAdmin
     ? '<div class="form-block" style="border:2px solid var(--red);">'
         + fb('🚫 Cancel a DO — Admin Only')
-        + '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Select the DO to cancel and give a reason. It will be removed from all queues immediately.</div>'
+        + '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Select the DO to cancel and give a reason.</div>'
         + grid([
             fg('Select DO to Cancel',
               '<select id="f2-cancel-sel"><option value="">— Select DO No. —</option>'
@@ -957,75 +939,35 @@ function renderUser2Form() {
         + '</div>'
     : '';
 
-  // Build the checklist table of all pending DOs
   if (!pending.length) {
     return cancelBlock
       + '<div class="form-block"><div class="empty" style="padding:30px">'
-      + '<div class="empty-icon">⏳</div>'
-      + '<div class="empty-text">No pending DOs for Section 2.</div>'
-      + '</div>'
+      + '<div class="empty-icon">⏳</div><div class="empty-text">No pending DOs for Section 2.</div></div>'
       + '<button class="btn btn-secondary" style="margin-top:8px" onclick="loadRecords().then(function(){renderUserForm(2)})">↻ Refresh</button>'
       + '</div>';
   }
 
-  var rows = '';
-  pending.forEach(function(d, idx) {
-    var aqty = d.bags ? (d.bags/40).toFixed(3) : '—';
-    rows += '<tr id="u2row-'+d.id+'">'
-      // Checkbox column
-      + '<td style="text-align:center;padding:10px 8px;">'
-      +   '<input type="checkbox" id="u2cb-'+d.id+'" class="u2-cb" style="width:18px;height:18px;accent-color:var(--green);cursor:pointer;" onchange="onU2CbChange(\''+d.id+'\')">'
-      + '</td>'
-      // DO info
-      + '<td style="font-family:var(--mono);font-weight:700;color:var(--amber);padding:10px 8px;">'+d.do_no+'</td>'
-      + '<td style="padding:10px 8px;">'+d.consignee+'</td>'
-      + '<td style="font-family:var(--mono);padding:10px 8px;">'+( d.bags||'—')+'</td>'
-      + '<td style="font-family:var(--mono);padding:10px 8px;">'+aqty+' MT</td>'
-      + '<td style="padding:10px 8px;">'+(d.grade||'—')+'</td>'
-      + '<td style="padding:10px 8px;">'+(d.destination||'—')+'</td>'
-      // Lorry No input (only enabled when checked)
-      + '<td style="padding:6px 8px;"><input id="u2-lorry-'+d.id+'" placeholder="Lorry No." style="width:130px;text-transform:uppercase;" disabled></td>'
-      + '<td style="padding:6px 8px;"><input id="u2-driver-'+d.id+'" placeholder="Driver No." style="width:120px;" disabled></td>'
-      + '<td style="padding:6px 8px;"><input id="u2-gp-'+d.id+'" placeholder="GP No." style="width:100px;" disabled></td>'
-      + '</tr>';
-  });
-
-  var tableHtml = '<div style="overflow-x:auto;border-radius:var(--radius2);border:1px solid var(--border);box-shadow:var(--shadow);margin-bottom:14px;">'
-    + '<table style="width:100%;border-collapse:collapse;font-size:12px;background:var(--white);">'
-    + '<thead><tr style="background:var(--navy);">'
-    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;text-align:center;white-space:nowrap;">✓ Confirm</th>'
-    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;">DO No.</th>'
-    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Consignee</th>'
-    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Bags</th>'
-    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">A-Qty MT</th>'
-    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Grade</th>'
-    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Destination</th>'
-    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Lorry No. *</th>'
-    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Driver No.</th>'
-    + '<th style="padding:9px 8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">GP No.</th>'
-    + '</tr></thead>'
-    + '<tbody id="u2-tbody">'+rows+'</tbody>'
-    + '</table></div>';
-
-  var noteHtml = '<div style="background:var(--amberlt);border:1px solid #fcd34d;border-radius:var(--radius);padding:10px 14px;font-size:11px;font-weight:600;color:#92400e;margin-bottom:14px;">'
-    + '✓ Tick the checkbox next to each DO whose lorry has arrived and gate pass is issued. Fill Lorry No. for each ticked DO. Un-ticked DOs stay pending.'
-    + '</div>';
-
-  var footerHtml = '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
-    + '<button class="btn btn-amber" id="u2-save-all-btn" onclick="saveUser2Checked()">Save Confirmed DOs →</button>'
-    + '<span id="u2-checked-count" style="font-size:11px;font-weight:700;color:var(--muted);">0 selected</span>'
-    + '<button class="btn btn-secondary" onclick="loadRecords().then(function(){renderUserForm(2)})">↻ Refresh</button>'
-    + '</div>';
-
+  // Normal form — select DO, fill details, save
+  // "View List" button opens modal with all pending DOs for bulk confirm
   return cancelBlock
-    + '<div class="form-block">'
-    + fb('🚛 User 2 — Lorry & Gate Pass Confirmation (' + pending.length + ' pending)')
-    + noteHtml
-    + tableHtml
-    + footerHtml
-    + '</div>';
+    + renderDOSelector(2, pending)
+    + block('🚛 User 2 — Lorry & Gate Pass',
+        grid([
+          fg('Lorry No. *','<input id="f2-lorry-no" placeholder="e.g. KA01AB1234" style="text-transform:uppercase" oninput="onLorryNoInput()">'),
+          fg('Driver No.', fi('f2-driver-no','Driver mobile no.')),
+          fg('Lorry Placement Date & Time (Auto)', fc('f2-placement','Auto-fills when Lorry No. entered')),
+          fg('Lorry Starters', fi('f2-starters','Starter details')),
+          fg('GP No.', fi('f2-gp-no','Gate Pass No.')),
+          fg('GP Time (Auto = Today)', fc('f2-gp-time',''))
+        ]),
+        actions(
+          btn('btn-amber','saveUserN(2)','Save Lorry Details →')
+          + ' <button class="btn btn-secondary" onclick="openU2ViewList()" style="display:inline-flex;align-items:center;gap:6px;margin-left:8px;">'
+          + '📋 View List <span style="background:var(--amber);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:800;margin-left:4px;">'+pending.length+'</span>'
+          + '</button>'
+        )
+      );
 }
-
 function renderUser3Form() {
   var isAdmin = userRole === 'admin' || userRole === 'superadmin';
   var pending3 = getPendingForUser(3);
@@ -1317,54 +1259,107 @@ function calcBrAmt(){ sv('f7-br-amt',(gv('f7-br-rate')*gv('f7-cqty-ro')).toFixed
 function onInsNumSelect(){var sel=document.getElementById('f6-ins-num-select'),inp=document.getElementById('f6-ins-num');if(sel&&sel.value&&inp){inp.value=sel.value;calcInsPremium();}}
 function calcInsPremium(){ sv('f6-ins-pre',(gv('f6-inv-val-ro')*gv('f6-ins-num')/100000).toFixed(2)); }
 // ════════════════════════════════════════════════════════════
-// USER 2 — CHECKBOX LIST HANDLERS
+// USER 2 — VIEW LIST MODAL
 // ════════════════════════════════════════════════════════════
-function onU2CbChange(id) {
-  // Enable/disable lorry input row based on checkbox
-  var cb     = document.getElementById('u2cb-'+id);
-  var lorry  = document.getElementById('u2-lorry-'+id);
-  var driver = document.getElementById('u2-driver-'+id);
-  var gp     = document.getElementById('u2-gp-'+id);
-  var row    = document.getElementById('u2row-'+id);
-  var checked = cb && cb.checked;
-  if (lorry)  lorry.disabled  = !checked;
-  if (driver) driver.disabled = !checked;
-  if (gp)     gp.disabled     = !checked;
-  if (row) row.style.background = checked ? 'var(--greenbg)' : '';
-  // Update count
-  var total = document.querySelectorAll('.u2-cb:checked').length;
-  var el = document.getElementById('u2-checked-count');
+function openU2ViewList() {
+  var pending = getPendingForUser(2);
+  document.getElementById('modal-title').textContent = '📋 User 2 — View & Confirm List (' + pending.length + ' pending)';
+
+  if (!pending.length) {
+    document.getElementById('modal-body').innerHTML =
+      '<div class="empty" style="padding:30px"><div class="empty-icon">⏳</div><div class="empty-text">No pending DOs</div></div>';
+    document.getElementById('modal-overlay').classList.add('open');
+    return;
+  }
+
+  var rows = '';
+  pending.forEach(function(d) {
+    var aqty = d.bags ? (d.bags/40).toFixed(3) : '—';
+    // Pre-fill lorry/gp from existing record data
+    var rec = records.find(function(r){ return String(r.ID) === String(d.id); });
+    var existLorry  = rec ? (rec.LORRY_NO||'')  : '';
+    var existDriver = rec ? (rec.DRIVER_NO||'') : '';
+    var existGP     = rec ? (rec.GP_NO||'')     : '';
+    rows += '<tr id="vl-row-'+d.id+'" style="border-bottom:1px solid var(--border);">'
+      + '<td style="text-align:center;padding:8px;vertical-align:middle;">'
+      +   '<input type="checkbox" id="vlcb-'+d.id+'" class="vl-cb" style="width:18px;height:18px;accent-color:var(--green);cursor:pointer;" onchange="onVLCbChange(\''+d.id+'\')">'
+      + '</td>'
+      + '<td style="font-family:var(--mono);font-weight:700;color:var(--amber);padding:8px;vertical-align:middle;white-space:nowrap;">'+d.do_no+'</td>'
+      + '<td style="padding:8px;vertical-align:middle;">'+d.consignee+'</td>'
+      + '<td style="font-family:var(--mono);padding:8px;vertical-align:middle;white-space:nowrap;">'+d.bags+' bags<br><span style="color:var(--muted)">'+aqty+' MT</span></td>'
+      + '<td style="padding:8px;vertical-align:middle;">'+(d.grade||'—')+'</td>'
+      + '<td style="padding:8px;vertical-align:middle;">'+(d.unloading||d.destination||'—')+'</td>'
+      // Editable fields — always enabled so user can update data
+      + '<td style="padding:6px 4px;"><input id="vl-lorry-'+d.id+'" value="'+escHtml(existLorry)+'" placeholder="Lorry No." style="width:120px;text-transform:uppercase;"></td>'
+      + '<td style="padding:6px 4px;"><input id="vl-driver-'+d.id+'" value="'+escHtml(existDriver)+'" placeholder="Driver No." style="width:110px;"></td>'
+      + '<td style="padding:6px 4px;"><input id="vl-gp-'+d.id+'" value="'+escHtml(existGP)+'" placeholder="GP No." style="width:90px;"></td>'
+      + '</tr>';
+  });
+
+  var note = '<div style="background:var(--amberlt);border:1px solid #fcd34d;border-radius:var(--radius);padding:9px 12px;font-size:11px;font-weight:600;color:#92400e;margin-bottom:12px;">'
+    + '✓ Tick the DOs whose lorry has arrived. Edit any field. Only ticked DOs will move to User 3.'
+    + '</div>';
+
+  var tbl = '<div style="overflow-x:auto;max-height:60vh;overflow-y:auto;">'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
+    + '<thead style="position:sticky;top:0;z-index:2;"><tr style="background:var(--navy);">'
+    + '<th style="padding:8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;text-align:center;white-space:nowrap;">Confirm</th>'
+    + '<th style="padding:8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;white-space:nowrap;">DO No.</th>'
+    + '<th style="padding:8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;">Consignee</th>'
+    + '<th style="padding:8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;">Bags / MT</th>'
+    + '<th style="padding:8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;">Grade</th>'
+    + '<th style="padding:8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;">Unloading</th>'
+    + '<th style="padding:8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;">Lorry No.</th>'
+    + '<th style="padding:8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;">Driver No.</th>'
+    + '<th style="padding:8px;color:#8da5c4;font-size:9px;font-weight:700;text-transform:uppercase;">GP No.</th>'
+    + '</tr></thead>'
+    + '<tbody>'+rows+'</tbody>'
+    + '</table></div>';
+
+  var footer = '<div style="display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap;">'
+    + '<button class="btn btn-amber" onclick="saveVLChecked()">✓ Save Ticked DOs → Move to User 3</button>'
+    + '<span id="vl-count" style="font-size:11px;font-weight:700;color:var(--muted);">0 selected</span>'
+    + '<button class="btn btn-secondary" onclick="closeModal()">Close</button>'
+    + '</div>';
+
+  document.getElementById('modal-body').innerHTML = note + tbl + footer;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function onVLCbChange(id) {
+  var row = document.getElementById('vl-row-'+id);
+  var cb  = document.getElementById('vlcb-'+id);
+  if (row) row.style.background = (cb && cb.checked) ? 'var(--greenbg)' : '';
+  var total = document.querySelectorAll('.vl-cb:checked').length;
+  var el = document.getElementById('vl-count');
   if (el) el.textContent = total + ' selected';
 }
 
-async function saveUser2Checked() {
-  var checked = document.querySelectorAll('.u2-cb:checked');
+async function saveVLChecked() {
+  var checked = document.querySelectorAll('.vl-cb:checked');
   if (!checked.length) { toast('Tick at least one DO to confirm', 'error'); return; }
-  var errors = [];
-  var saved  = 0;
+  var errors = [], saved = 0;
   setTopbar('Saving...');
   for (var i = 0; i < checked.length; i++) {
-    var id     = checked[i].id.replace('u2cb-','');
-    var lorry  = (document.getElementById('u2-lorry-'+id)||{}).value.trim().toUpperCase();
-    var driver = (document.getElementById('u2-driver-'+id)||{}).value.trim();
-    var gp     = (document.getElementById('u2-gp-'+id)||{}).value.trim();
-    if (!lorry) { errors.push('Lorry No. missing for one of the ticked DOs'); continue; }
+    var id     = checked[i].id.replace('vlcb-','');
+    var lorry  = (document.getElementById('vl-lorry-'+id)||{}).value.trim().toUpperCase();
+    var driver = (document.getElementById('vl-driver-'+id)||{}).value.trim();
+    var gp     = (document.getElementById('vl-gp-'+id)||{}).value.trim();
+    if (!lorry) { errors.push('Lorry No. missing — fill for all ticked DOs'); continue; }
     var now = new Date().toISOString();
-    var upd = {
+    var r = await sb.from('transport_data').update({
       lorry_no:lorry, driver_no:driver, gp_no:gp,
-      gp_time:now, lorry_placement:now,
-      lorry_no_mirror:lorry,
-      status:'SEC2_DONE', sec2_by:currentUser.id,
-      updated_at:now
-    };
-    var r = await sb.from('transport_data').update(upd).eq('id', id);
-    if (r.error) errors.push('Failed for ID '+id+': '+r.error.message);
+      gp_time:now, lorry_placement:now, lorry_no_mirror:lorry,
+      status:'SEC2_DONE', sec2_by:currentUser.id, updated_at:now
+    }).eq('id', id);
+    if (r.error) errors.push('Failed: '+r.error.message);
     else saved++;
   }
   setTopbar('');
-  if (errors.length) toast(errors[0], 'error');
+  if (errors.length) { toast(errors[0], 'error'); return; }
   if (saved > 0) {
-    toast(saved+' DO(s) confirmed and moved to User 3!', 'success');
+    closeModal();
+    toast(saved+' DO(s) confirmed → moved to User 3!', 'success');
     await loadRecords();
     renderUserForm(2);
   }
